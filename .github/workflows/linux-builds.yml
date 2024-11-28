@@ -69,13 +69,11 @@ jobs:
       - name: Build .deb package
         run: |
           npm run build:electron:deb
-          mv ./packages/bruno-electron/out/latest-linux.yml ./packages/bruno-electron/out/latest-deb-linux.yml
-        shell: bash
-
-      - name: Build AppImage package
-        run: |
-          npm run build:electron:linux
-          mv ./packages/bruno-electron/out/latest-linux.yml ./packages/bruno-electron/out/latest-appimage-linux.yml
+          if [ -f ./packages/bruno-electron/out/latest-linux.yml ]; then
+            mv ./packages/bruno-electron/out/latest-linux.yml ./packages/bruno-electron/out/latest-deb-linux.yml
+          else
+            echo "Warning: latest-linux.yml not found, skipping .deb YAML move."
+          fi
         shell: bash
 
       - name: Upload .deb build and metadata
@@ -87,6 +85,16 @@ jobs:
             ./packages/bruno-electron/out/latest-deb-linux.yml
           retention-days: 1
 
+      - name: Build AppImage package
+        run: |
+          npm run build:electron:linux
+          if [ -f ./packages/bruno-electron/out/latest-linux.yml ]; then
+            mv ./packages/bruno-electron/out/latest-linux.yml ./packages/bruno-electron/out/latest-appimage-linux.yml
+          else
+            echo "Warning: latest-linux.yml not found, skipping AppImage YAML move."
+          fi
+        shell: bash
+
       - name: Upload AppImage build and metadata
         uses: actions/upload-artifact@v4
         with:
@@ -95,7 +103,7 @@ jobs:
             ./packages/bruno-electron/out/*.AppImage
             ./packages/bruno-electron/out/latest-appimage-linux.yml
           retention-days: 1
-
+        
   publish:
     needs: [tagname, linux]
     runs-on: ubuntu-latest
@@ -106,19 +114,19 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-
+  
       - name: Download .deb and AppImage build artifacts
         uses: actions/download-artifact@v4
         with:
           name: deb-build
           path: ./builds/deb
-
+  
       - name: Download AppImage build artifacts
         uses: actions/download-artifact@v4
         with:
           name: appimage-build
           path: ./builds/appimage
-
+  
       - name: Create GitHub Release and Upload Artifacts
         run: |
           TAG_NAME=${{ needs.tagname.outputs.tag_name }}
@@ -132,3 +140,4 @@ jobs:
             --title "Release $TAG_NAME" \
             --notes "Release notes for $TAG_NAME"
           shell: bash
+  
