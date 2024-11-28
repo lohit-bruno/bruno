@@ -1,0 +1,134 @@
+name: linux builds
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name for release'
+        required: false
+        default: release
+
+env:
+  GH_TOKEN: ${{ secrets.GH_TOKEN }}
+  GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+  NEXT_PUBLIC_POSTHOG_API_KEY: ${{ secrets.NEXT_PUBLIC_POSTHOG_API_KEY }}
+
+jobs:
+  tagname:
+    runs-on: ubuntu-latest
+    outputs:
+      tag_name: ${{ steps.set_tag.outputs.tag }}
+    steps:
+      - name: Set Tag Name
+        id: set_tag
+        run: echo "tag=${{ github.event.inputs.tag_name }}" >> $GITHUB_OUTPUT
+
+  linux:
+    runs-on: ubuntu-latest
+    container: node:22.11.0
+    needs: tagname
+    env:
+      RELEASE_TAG_NAME: ${{ needs.tagname.outputs.tag_name }}
+      DEBIAN_FRONTEND: noninteractive
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch dependencies
+        run: npm i --legacy-peer-deps
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install Python and build tools
+        run: |
+          apt-get update && apt-get install -y python3 python3-venv python3-dev build-essential
+          python3 -m venv venv
+          ./venv/bin/pip install --upgrade pip
+          ./venv/bin/pip install setuptools wheel
+        shell: bash
+
+      - name: Rebuild Native Modules for Electron
+        run: |
+          npx electron-rebuild --force --version 33.2.0
+        shell: bash
+
+      - name: Build packages
+        run: |
+          ./venv/bin/pip install --upgrade pip
+          ./venv/bin/pip install setuptools wheel
+          npm run build:graphql-docs
+          npm run build:bruno-query
+          npm run build:bruno-common
+          npm run sandbox:bundle-libraries --workspace=packages/bruno-js
+          npm run build:web
+        shell: bash
+
+      - name: Build .deb package
+        run: |
+          npm run build:electron:deb
+          mv ./packages/bruno-electron/out/latest-linux.yml ./packages/bruno-electron/out/latest-deb-linux.yml
+        shell: bash
+
+      - name: Build AppImage package
+        run: |
+          npm run build:electron:linux
+          mv ./packages/bruno-electron/out/latest-linux.yml ./packages/bruno-electron/out/latest-appimage-linux.yml
+        shell: bash
+
+      - name: Upload .deb build and metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-build
+          path: |
+            ./packages/bruno-electron/out/*.deb
+            ./packages/bruno-electron/out/latest-deb-linux.yml
+          retention-days: 1
+
+      - name: Upload AppImage build and metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: appimage-build
+          path: |
+            ./packages/bruno-electron/out/*.AppImage
+            ./packages/bruno-electron/out/latest-appimage-linux.yml
+          retention-days: 1
+
+  publish:
+    needs: [tagname, linux]
+    runs-on: ubuntu-latest
+    env:
+      GH_REPO: ${{ github.repository }}
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download .deb and AppImage build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: deb-build
+          path: ./builds/deb
+
+      - name: Download AppImage build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: appimage-build
+          path: ./builds/appimage
+
+      - name: Create GitHub Release and Upload Artifacts
+        run: |
+          TAG_NAME=${{ needs.tagname.outputs.tag_name }}
+          
+          # Create GitHub release
+          gh release create "$TAG_NAME" \
+            ./builds/deb/*.deb \
+            ./builds/deb/latest-deb-linux.yml \
+            ./builds/appimage/*.AppImage \
+            ./builds/appimage/latest-appimage-linux.yml \
+            --title "Release $TAG_NAME" \
+            --notes "Release notes for $TAG_NAME"
+          shell: bash
