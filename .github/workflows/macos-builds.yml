@@ -1,0 +1,99 @@
+name: macos builds
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name for release'
+        required: false
+        default: release
+
+env:
+  GH_TOKEN: ${{ secrets.GH_TOKEN }}
+  GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+  NEXT_PUBLIC_POSTHOG_API_KEY: ${{ secrets.NEXT_PUBLIC_POSTHOG_API_KEY }}
+  APPLE_TEAM_ID: ${{ secrets.BRUNO_RELEASE_APPLE_TEAM_ID }}
+  APPLE_ID: ${{ secrets.BRUNO_RELEASE_APPLE_ID }}
+  APPLE_ID_PASSWORD: ${{ secrets.BRUNO_RELEASE_APPLE_ID_PASSWORD }}
+
+jobs:
+  tagname:
+    runs-on: ubuntu-latest
+    outputs:
+      tag_name: ${{ steps.tag.outputs.tag }}
+    steps:
+      - if: github.event_name == 'workflow_dispatch'
+        run: echo "TAG_NAME=${{ github.event.inputs.tag_name }}" >> $GITHUB_ENV
+
+      - id: tag
+        run: echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
+
+  macos:
+    runs-on: macos-latest
+    needs: tagname
+    env:
+      RELEASE_TAG_NAME: ${{ needs.tagname.outputs.tag_name }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 22.11.0
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install build tools
+        run: |
+          # Install required build tools for native dependencies
+          python3 -m venv venv
+          source venv/bin/activate
+          python -m pip install --upgrade pip
+          python -m pip install setuptools wheel
+      - name: Install Node.js dependencies
+        run: |
+          source venv/bin/activate
+          npm install --legacy-peer-deps
+      - name: Build packages
+        run: |
+          source venv/bin/activate
+          npm run build:graphql-docs
+          npm run build:bruno-query
+          npm run build:bruno-common
+          npm run sandbox:bundle-libraries --workspace=packages/bruno-js
+          npm run build:web
+      - name: Build app
+        run: |
+          source venv/bin/activate
+          npm run build:electron:mac
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-macos
+          path: |
+            ./packages/bruno-electron/out/bruno_*
+            ./packages/bruno-electron/out/latest-mac.yml
+          retention-days: 1
+          if-no-files-found: error
+
+  publish:
+    needs: [tagname, macos]
+    runs-on: ubuntu-latest
+    env:
+      GH_REPO: ${{ github.repository }}
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+
+      - run: echo "TAG_NAME=${{ needs.tagname.outputs.tag_name }}" >> $GITHUB_ENV
+
+      - if: github.event_name == 'workflow_dispatch'
+        run: |
+          gh release create $TAG_NAME build-macos/*
