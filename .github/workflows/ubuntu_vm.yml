@@ -1,0 +1,38 @@
+name: Ubuntu VM with XRDP and tmate
+
+on:
+  workflow_dispatch:  # Manually trigger the workflow
+
+jobs:
+  ubuntu-vm:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update and install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y xrdp xfce4 xfce4-terminal xorg dbus-x11 x11-xserver-utils
+
+      - name: Configure XRDP
+        run: |
+          echo "xfce4-session" > ~/.xsession
+          sudo sed -i 's/3389/3390/g' /etc/xrdp/xrdp.ini  # Change port if needed
+          sudo systemctl enable --now xrdp
+          sudo systemctl restart xrdp
+          sudo ufw allow 3390/tcp
+
+      - name: Install tmate
+        run: |
+          sudo apt install -y tmate
+
+      - name: Start tmate session
+        run: |
+          tmate -S /tmp/tmate.sock new-session -d
+          tmate -S /tmp/tmate.sock wait tmate-ready
+          tmate -S /tmp/tmate.sock display -p '#{tmate_ssh}' > tmate_url.txt
+          tmate -S /tmp/tmate.sock display -p '#{tmate_web}' >> tmate_url.txt
+
+      - name: Show tmate session URL
+        run: cat tmate_url.txt
+
+      - name: Keep the session alive
+        run: sleep infinity
