@@ -20,11 +20,16 @@ export const tabsSlice = createSlice({
   initialState,
   reducers: {
     addTab: (state, action) => {
+      if (state.tabs.find((t) => t.locked)) {
+        // todo: should be based on collectionUid
+        return;
+      }
       const { uid, collectionUid, type, requestPaneTab, preview } = action.payload;
       const nonReplaceableTabTypes = [
         "variables",
         "collection-runner",
         "security-settings",
+        "workflows"
       ];
     
       const existingTab = find(state.tabs, (tab) => tab.uid === uid);
@@ -75,6 +80,11 @@ export const tabsSlice = createSlice({
       state.activeTabUid = uid;
     },
     focusTab: (state, action) => {
+      if (state.tabs.find((t) => t.locked)) {
+        // todo: should be based on collectionUid
+        return;
+      }
+
       state.activeTabUid = action.payload.uid;
     },
     switchTab: (state, action) => {
@@ -162,6 +172,13 @@ export const tabsSlice = createSlice({
       } else{
         console.error("Tab not found!")
       }
+    },
+    toggleTabLock: (state, action) => {
+      const { uid } = action.payload;
+      const tab = find(state.tabs, (t) => t.uid === uid);
+      if (tab) {
+        tab.locked = !tab.locked;
+      }
     }
   }
 });
@@ -175,7 +192,8 @@ export const {
   updateResponsePaneTab,
   closeTabs,
   closeAllCollectionTabs,
-  makeTabPermanent
+  makeTabPermanent,
+  toggleTabLock
 } = tabsSlice.actions;
 
 export default tabsSlice.reducer;

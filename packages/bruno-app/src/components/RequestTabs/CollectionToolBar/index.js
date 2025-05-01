@@ -42,6 +42,16 @@ const CollectionToolBar = ({ collection }) => {
     );
   };
 
+  const viewWorkflows = () => {
+    dispatch(
+      addTab({
+        uid: collection.uid,
+        collectionUid: collection.uid,
+        type: 'workflows'
+      })
+    );
+  };
+
   return (
     <StyledWrapper>
       <div className="flex items-center p-2">
@@ -52,6 +62,11 @@ const CollectionToolBar = ({ collection }) => {
         <div className="flex flex-3 items-center justify-end">
           <span className="mr-2">
             <JsSandboxMode collection={collection} />
+          </span>
+          <span className="mr-3">
+            <ToolHint text="Workflows" toolhintId="WorkflowsToolhintId" place='bottom'>
+              <div className="cursor-pointer" onClick={viewWorkflows}>workflows</div>
+            </ToolHint>
           </span>
           <span className="mr-3">
             <ToolHint text="Runner" toolhintId="RunnnerToolhintId" place='bottom'>

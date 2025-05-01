@@ -1,0 +1,13 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# component structure
+
+- reusable stateless components when possible
+
+- styling 
+  - for container type components create and use 'StyledWrapper' components
+  - use [light.js](mdc:bruno/bruno/bruno/packages/bruno-app/src/themes/light.js) and [dark.js](mdc:bruno/bruno/bruno/packages/bruno-app/src/themes/dark.js) mainly, and use tailwindcss only for minor details 

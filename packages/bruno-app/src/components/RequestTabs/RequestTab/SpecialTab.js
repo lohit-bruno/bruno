@@ -53,6 +53,13 @@ const SpecialTab = ({ handleCloseClick, type, tabName, handleDoubleClick }) => {
           </>
         );
       }
+      case 'workflows': {
+        return (
+          <>
+            <span className="ml-1 leading-6">workflows</span>
+          </>
+        );
+      }
     }
   };
 

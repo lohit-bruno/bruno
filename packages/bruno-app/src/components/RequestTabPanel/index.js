@@ -26,6 +26,7 @@ import CollectionOverview from 'components/CollectionSettings/Overview';
 import RequestNotLoaded from './RequestNotLoaded';
 import RequestIsLoading from './RequestIsLoading';
 import { closeTabs } from 'providers/ReduxStore/slices/tabs';
+import Workflows from 'components/Workflows/index';
 
 const MIN_LEFT_PANE_WIDTH = 300;
 const MIN_RIGHT_PANE_WIDTH = 350;
@@ -156,6 +157,10 @@ const RequestTabPanel = () => {
 
   if (focusedTab.type === 'collection-settings') {
     return <CollectionSettings collection={collection} />;
+  }
+
+  if (focusedTab.type === 'workflows') {
+    return <Workflows collectionUid={collection.uid} />;
   }
 
   if (focusedTab.type === 'collection-overview') {
