@@ -1086,3 +1086,7 @@ export const getFormattedCollectionOauth2Credentials = ({ oauth2Credentials = []
   });
   return credentialsVariables;
 };
+
+export const findWorkflowByUid = ({ collectionUid, workflows, workflowUid }) => {
+  return find(workflows, (w) => w.collectionUid === collectionUid && w.uid == workflowUid);
+};

@@ -25,6 +25,7 @@ import { useDispatch } from 'react-redux';
 import { isElectron } from 'utils/common/platform';
 import { globalEnvironmentsUpdateEvent, updateGlobalEnvironments } from 'providers/ReduxStore/slices/global-environments';
 import { collectionAddOauth2CredentialsByUrl } from 'providers/ReduxStore/slices/collections/index';
+import { runWorkflowEvent } from 'providers/ReduxStore/slices/workflows';
 
 const useIpcEvents = () => {
   const dispatch = useDispatch();
@@ -173,6 +174,10 @@ const useIpcEvents = () => {
       dispatch(collectionAddOauth2CredentialsByUrl(payload));
     });
 
+    const removeRunWorkflowEventListener = ipcRenderer.on('main:run-workflow-request-event', (val) => {
+      dispatch(runWorkflowEvent(val));
+    });
+
     return () => {
       removeCollectionTreeUpdateListener();
       removeOpenCollectionListener();
@@ -193,6 +198,7 @@ const useIpcEvents = () => {
       removeGlobalEnvironmentsUpdatesListener();
       removeSnapshotHydrationListener();
       removeCollectionOauth2CredentialsUpdatesListener();
+      removeRunWorkflowEventListener();
     };
   }, [isElectron]);
 };
