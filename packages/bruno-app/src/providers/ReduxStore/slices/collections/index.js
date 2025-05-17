@@ -1594,6 +1594,27 @@ export const collectionsSlice = createSlice({
           case 'oauth2':
             set(folder, 'root.request.auth.oauth2', action.payload.content);
             break;
+          case 'basic':
+            set(folder, 'root.request.auth.basic', action.payload.content);
+            break;
+          case 'bearer':
+            set(folder, 'root.request.auth.bearer', action.payload.content);
+            break;
+          case 'digest':
+            set(folder, 'root.request.auth.digest', action.payload.content);
+            break;
+          case 'ntlm':
+            set(folder, 'root.request.auth.ntlm', action.payload.content);
+            break;
+          case 'apikey':
+            set(folder, 'root.request.auth.apikey', action.payload.content);
+            break;
+          case 'awsv4':
+            set(folder, 'root.request.auth.awsv4', action.payload.content);
+            break;
+          case 'wsse':
+            set(folder, 'root.request.auth.wsse', action.payload.content);
+            break;
         }
       }
     },
@@ -1720,6 +1741,9 @@ export const collectionsSlice = createSlice({
             folderItem.name = file?.data?.meta?.name;
           }
           folderItem.root = file.data;
+          if (file?.data?.meta?.seq) {
+            folderItem.seq = file.data?.meta?.seq;
+          }
         }
         return;
       }
@@ -1796,9 +1820,10 @@ export const collectionsSlice = createSlice({
           currentPath = path.join(currentPath, directoryName);
           if (!childItem) {
             childItem = {
-              uid: uuid(),
+              uid: dir?.meta?.uid || uuid(),
               pathname: currentPath,
               name: dir?.meta?.name || directoryName,
+              seq: dir?.meta?.seq || 1,
               filename: directoryName,
               collapsed: true,
               type: 'folder',
@@ -1829,6 +1854,9 @@ export const collectionsSlice = createSlice({
         if (folderItem) {
           if (file?.data?.meta?.name) {
             folderItem.name = file?.data?.meta?.name;
+          }
+          if (file?.data?.meta?.seq) {
+            folderItem.seq = file?.data?.meta?.seq;
           }
           folderItem.root = file.data;
         }

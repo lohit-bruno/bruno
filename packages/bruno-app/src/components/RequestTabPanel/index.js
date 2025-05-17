@@ -26,6 +26,7 @@ import CollectionOverview from 'components/CollectionSettings/Overview';
 import RequestNotLoaded from './RequestNotLoaded';
 import RequestIsLoading from './RequestIsLoading';
 import { closeTabs } from 'providers/ReduxStore/slices/tabs';
+import FolderNotFound from './FolderNotFound';
 import Workflows from 'components/Workflows/index';
 
 const MIN_LEFT_PANE_WIDTH = 300;
@@ -170,11 +171,7 @@ const RequestTabPanel = () => {
   if (focusedTab.type === 'folder-settings') {
     const folder = findItemInCollection(collection, focusedTab.folderUid);
     if (!folder) {
-      dispatch(
-        closeTabs({
-          tabUids: [activeTabUid]
-        })
-      );
+      return <FolderNotFound folderUid={focusedTab.folderUid} />;
     }
     
     return <FolderSettings collection={collection} folder={folder} />;
