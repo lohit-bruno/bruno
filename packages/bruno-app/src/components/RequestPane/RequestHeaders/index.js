@@ -12,19 +12,16 @@ import { headers as StandardHTTPHeaders } from 'know-your-http-well';
 import { MimeTypes } from 'utils/codemirror/autocompleteConstants';
 import Table from 'components/Table/index';
 import ReorderTable from 'components/ReorderTable/index';
-import CodeEditor from 'components/CodeEditor';
-import { parseBulkKeyValue, serializeBulkKeyValue } from '../../../utils/common/bulkKeyValueUtils';
+import BulkEditCodeEditor from '../BulkEditCodeEditor';
 
 const headerAutoCompleteList = StandardHTTPHeaders.map((e) => e.header);
 
 const RequestHeaders = ({ item, collection }) => {
   const dispatch = useDispatch();
-  const { displayedTheme } = useTheme();
-  const preferences = useSelector((state) => state.app.preferences);
+  const { storedTheme } = useTheme();
   const headers = item.draft ? get(item, 'draft.request.headers') : get(item, 'request.headers');
   
   const [bulkEdit, setBulkEdit] = useState(false);
-  const [bulkText, setBulkText] = useState('');
 
   const addHeader = () => {
     dispatch(
@@ -82,36 +79,18 @@ const RequestHeaders = ({ item, collection }) => {
       );
     };
 
-  const handleBulkEdit = (value) => {
-    setBulkText(value);
-    const parsed = parseBulkKeyValue(value);
-    dispatch(setRequestHeaders({ collectionUid: collection.uid, itemUid: item.uid, headers: parsed }));
+  const toggleBulkEdit = () => {
+    setBulkEdit(!bulkEdit);
   };
 
-  const toggleBulkEdit = () => {
-    if (!bulkEdit) {
-      setBulkText(serializeBulkKeyValue(headers));
-    }
-    setBulkEdit(!bulkEdit);
+  const handleBulkHeadersChange = (newHeaders) => {
+    dispatch(setRequestHeaders({ collectionUid: collection.uid, itemUid: item.uid, headers: newHeaders }));
   };
 
   if (bulkEdit) {
     return (
       <StyledWrapper className="w-full mt-3">
-        <div className="h-[200px]">
-          <CodeEditor
-            mode="text/plain"
-            theme={displayedTheme}
-            font={preferences.codeFont || 'default'}
-            value={bulkText}
-            onEdit={handleBulkEdit}
-          />
-        </div>
-        <div className="flex btn-action justify-between items-center mt-3">
-          <button className="text-link select-none ml-auto" onClick={toggleBulkEdit}>
-            Key/Value Edit
-          </button>
-        </div>
+        <BulkEditCodeEditor params={headers} onChange={handleBulkHeadersChange} onToggle={toggleBulkEdit} />
       </StyledWrapper>
     );
   }
@@ -133,7 +112,7 @@ const RequestHeaders = ({ item, collection }) => {
                     <td className='flex relative'>
                       <SingleLineEditor
                         value={header.name}
-                        theme={displayedTheme}
+                        theme={storedTheme}
                         onSave={onSave}
                         onChange={(newValue) =>
                           handleHeaderValueChange(
@@ -154,7 +133,7 @@ const RequestHeaders = ({ item, collection }) => {
                     <td>
                       <SingleLineEditor
                         value={header.value}
-                        theme={displayedTheme}
+                        theme={storedTheme}
                         onSave={onSave}
                         onChange={(newValue) =>
                           handleHeaderValueChange(

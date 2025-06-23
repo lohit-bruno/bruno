@@ -19,22 +19,16 @@ import { saveRequest, sendRequest } from 'providers/ReduxStore/slices/collection
 import StyledWrapper from './StyledWrapper';
 import Table from 'components/Table/index';
 import ReorderTable from 'components/ReorderTable';
-import CodeEditor from 'components/CodeEditor';
-import { parseBulkKeyValue, serializeBulkKeyValue } from '../../../utils/common/bulkKeyValueUtils';
-
-const parseBulkQueryParams = (value) =>
-  parseBulkKeyValue(value).map((item) => ({ ...item, type: 'query' }));
+import BulkEditCodeEditor from '../BulkEditCodeEditor';
 
 const QueryParams = ({ item, collection }) => {
   const dispatch = useDispatch();
-  const { displayedTheme } = useTheme();
-  const preferences = useSelector((state) => state.app.preferences);
+  const { storedTheme } = useTheme();
   const params = item.draft ? get(item, 'draft.request.params') : get(item, 'request.params');
   const queryParams = params.filter((param) => param.type === 'query');
   const pathParams = params.filter((param) => param.type === 'path');
   
   const [bulkEdit, setBulkEdit] = useState(false);
-  const [bulkText, setBulkText] = useState('');
 
   const handleAddQueryParam = () => {
     dispatch(
@@ -123,36 +117,23 @@ const QueryParams = ({ item, collection }) => {
     );
   };
 
-  const handleBulkEdit = (value) => {
-    setBulkText(value);
-    const parsed = parseBulkQueryParams(value);
-    dispatch(setQueryParams({ collectionUid: collection.uid, itemUid: item.uid, params: parsed }));
+  const toggleBulkEdit = () => {
+    setBulkEdit(!bulkEdit);
   };
 
-  const toggleBulkEdit = () => {
-    if (!bulkEdit) {
-      setBulkText(serializeBulkKeyValue(queryParams));
-    }
-    setBulkEdit(!bulkEdit);
+  const handleBulkParamsChange = (newParams) => {
+    const paramsWithType = newParams.map((item) => ({ ...item, type: 'query' }));
+    dispatch(setQueryParams({ collectionUid: collection.uid, itemUid: item.uid, params: paramsWithType }));
   };
 
   if (bulkEdit) {
     return (
       <StyledWrapper className="w-full mt-3">
-        <div className="h-[200px]">
-          <CodeEditor
-            mode="text/plain"
-            theme={displayedTheme}
-            font={preferences.codeFont || 'default'}
-            value={bulkText}
-            onEdit={handleBulkEdit}
-          />
-        </div>
-        <div className="flex btn-action justify-between items-center mt-3">
-          <button className="text-link select-none ml-auto" onClick={toggleBulkEdit}>
-            Key/Value Edit
-          </button>
-        </div>
+        <BulkEditCodeEditor
+          params={queryParams}
+          onChange={handleBulkParamsChange}
+          onToggle={toggleBulkEdit}
+        />
       </StyledWrapper>
     );
   }
@@ -187,7 +168,7 @@ const QueryParams = ({ item, collection }) => {
                     <td>
                       <SingleLineEditor
                         value={param.value}
-                        theme={displayedTheme}
+                        theme={storedTheme}
                         onSave={onSave}
                         onChange={(newValue) => handleQueryParamChange({ target: { value: newValue } }, param, 'value')}
                         onRun={handleRun}
@@ -263,7 +244,7 @@ const QueryParams = ({ item, collection }) => {
                       <td>
                         <SingleLineEditor
                           value={path.value}
-                          theme={displayedTheme}
+                          theme={storedTheme}
                           onSave={onSave}
                           onChange={(newValue) =>
                             handlePathParamChange(
