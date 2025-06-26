@@ -4,7 +4,7 @@ import { useTheme } from 'providers/Theme';
 import { useSelector } from 'react-redux';
 import { parseBulkKeyValue, serializeBulkKeyValue } from 'utils/common/bulkKeyValueUtils';
 
-const BulkEditCodeEditor = ({ params, onChange, onToggle, onSave, onRun }) => {
+const BulkEditor = ({ params, onChange, onToggle, onSave, onRun }) => {
   const preferences = useSelector((state) => state.app.preferences);
   const { displayedTheme } = useTheme();
 
@@ -37,4 +37,4 @@ const BulkEditCodeEditor = ({ params, onChange, onToggle, onSave, onRun }) => {
   );
 };
 
-export default BulkEditCodeEditor;
+export default BulkEditor;

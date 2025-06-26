@@ -12,7 +12,7 @@ import { headers as StandardHTTPHeaders } from 'know-your-http-well';
 import { MimeTypes } from 'utils/codemirror/autocompleteConstants';
 import Table from 'components/Table/index';
 import ReorderTable from 'components/ReorderTable/index';
-import BulkEditCodeEditor from '../../BulkEditCodeEditor';
+import BulkEditor from '../../BulkEditor';
 
 const headerAutoCompleteList = StandardHTTPHeaders.map((e) => e.header);
 
@@ -21,7 +21,7 @@ const RequestHeaders = ({ item, collection }) => {
   const { storedTheme } = useTheme();
   const headers = item.draft ? get(item, 'draft.request.headers') : get(item, 'request.headers');
   
-  const [bulkEdit, setBulkEdit] = useState(false);
+  const [isBulkEditMode, setIsBulkEditMode] = useState(false);
 
   const addHeader = () => {
     dispatch(
@@ -79,21 +79,21 @@ const RequestHeaders = ({ item, collection }) => {
       );
     };
 
-  const toggleBulkEdit = () => {
-    setBulkEdit(!bulkEdit);
+  const toggleBulkEditMode = () => {
+    setIsBulkEditMode(!isBulkEditMode);
   };
 
   const handleBulkHeadersChange = (newHeaders) => {
     dispatch(setRequestHeaders({ collectionUid: collection.uid, itemUid: item.uid, headers: newHeaders }));
   };
 
-  if (bulkEdit) {
+  if (isBulkEditMode) {
     return (
       <StyledWrapper className="w-full mt-3">
-        <BulkEditCodeEditor
+        <BulkEditor
           params={headers}
           onChange={handleBulkHeadersChange}
-          onToggle={toggleBulkEdit}
+          onToggle={toggleBulkEditMode}
           onSave={onSave}
           onRun={handleRun}
         />
@@ -183,7 +183,7 @@ const RequestHeaders = ({ item, collection }) => {
         <button className="btn-action text-link pr-2 py-3 select-none" onClick={addHeader}>
           + Add Header
         </button>
-        <button className="btn-action text-link select-none" onClick={toggleBulkEdit}>
+        <button className="btn-action text-link select-none" onClick={toggleBulkEditMode}>
           Bulk Edit
         </button>
       </div>

@@ -19,7 +19,7 @@ import { saveRequest, sendRequest } from 'providers/ReduxStore/slices/collection
 import StyledWrapper from './StyledWrapper';
 import Table from 'components/Table/index';
 import ReorderTable from 'components/ReorderTable';
-import BulkEditCodeEditor from '../../BulkEditCodeEditor';
+import BulkEditor from '../../BulkEditor';
 
 const QueryParams = ({ item, collection }) => {
   const dispatch = useDispatch();
@@ -28,7 +28,7 @@ const QueryParams = ({ item, collection }) => {
   const queryParams = params.filter((param) => param.type === 'query');
   const pathParams = params.filter((param) => param.type === 'path');
   
-  const [bulkEdit, setBulkEdit] = useState(false);
+  const [isBulkEditMode, setIsBulkEditMode] = useState(false);
 
   const handleAddQueryParam = () => {
     dispatch(
@@ -117,8 +117,8 @@ const QueryParams = ({ item, collection }) => {
     );
   };
 
-  const toggleBulkEdit = () => {
-    setBulkEdit(!bulkEdit);
+  const toggleBulkEditMode = () => {
+    setIsBulkEditMode(!isBulkEditMode);
   };
 
   const handleBulkParamsChange = (newParams) => {
@@ -126,13 +126,13 @@ const QueryParams = ({ item, collection }) => {
     dispatch(setQueryParams({ collectionUid: collection.uid, itemUid: item.uid, params: paramsWithType }));
   };
 
-  if (bulkEdit) {
+  if (isBulkEditMode) {
     return (
       <StyledWrapper className="w-full mt-3">
-        <BulkEditCodeEditor
+        <BulkEditor
           params={queryParams}
           onChange={handleBulkParamsChange}
-          onToggle={toggleBulkEdit}
+          onToggle={toggleBulkEditMode}
           onSave={onSave}
           onRun={handleRun}
         />
@@ -202,7 +202,7 @@ const QueryParams = ({ item, collection }) => {
           <button className="btn-action text-link pr-2 py-3 select-none" onClick={handleAddQueryParam}>
             +&nbsp;<span>Add Param</span>
           </button>
-          <button className="btn-action text-link select-none" onClick={toggleBulkEdit}>
+          <button className="btn-action text-link select-none" onClick={toggleBulkEditMode}>
             Bulk Edit
           </button>
         </div>
