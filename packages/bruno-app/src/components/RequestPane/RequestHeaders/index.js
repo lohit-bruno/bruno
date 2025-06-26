@@ -173,8 +173,8 @@ const RequestHeaders = ({ item, collection }) => {
             : null}
         </ReorderTable>
       </Table>
-      <div className="flex justify-between mt-2 py-2 px-2">
-        <button className="btn-action text-link select-none" onClick={addHeader}>
+      <div className="flex justify-between mt-2">
+        <button className="btn-action text-link pr-2 py-3 select-none" onClick={addHeader}>
           + Add Header
         </button>
         <button className="btn-action text-link select-none" onClick={toggleBulkEdit}>

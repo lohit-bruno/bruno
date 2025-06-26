@@ -196,8 +196,8 @@ const QueryParams = ({ item, collection }) => {
           </ReorderTable>
         </Table>
 
-        <div className="flex justify-between mt-1 mb-4 py-2 px-2">
-          <button className="btn-action text-link select-none" onClick={handleAddQueryParam}>
+        <div className="flex justify-between mt-2">
+          <button className="btn-action text-link pr-2 py-3 select-none" onClick={handleAddQueryParam}>
             +&nbsp;<span>Add Param</span>
           </button>
           <button className="btn-action text-link select-none" onClick={toggleBulkEdit}>
