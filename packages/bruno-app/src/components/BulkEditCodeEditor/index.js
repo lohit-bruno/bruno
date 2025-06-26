@@ -10,8 +10,8 @@ const BulkEditCodeEditor = ({ params, onChange, onToggle }) => {
   const { displayedTheme } = useTheme();
 
   useEffect(() => {
-   setBulkText(serializeBulkKeyValue(params));
- }, [params]);
+    setBulkText(serializeBulkKeyValue(params));
+  }, [params]);
 
   const handleEdit = (value) => {
     setBulkText(value);
