@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import CodeEditor from 'components/CodeEditor';
 import { useTheme } from 'providers/Theme';
 import { useSelector } from 'react-redux';
@@ -6,8 +6,12 @@ import { parseBulkKeyValue, serializeBulkKeyValue } from 'utils/common/bulkKeyVa
 
 const BulkEditCodeEditor = ({ params, onChange, onToggle }) => {
   const preferences = useSelector((state) => state.app.preferences);
+  const [bulkText, setBulkText] = useState(serializeBulkKeyValue(params));
   const { displayedTheme } = useTheme();
-  const [bulkText, setBulkText] = useState(serializeBulkKeyValue(params || []));
+
+  useEffect(() => {
+   setBulkText(serializeBulkKeyValue(params));
+ }, [params]);
 
   const handleEdit = (value) => {
     setBulkText(value);
