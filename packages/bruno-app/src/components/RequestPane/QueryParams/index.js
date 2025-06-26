@@ -133,6 +133,7 @@ const QueryParams = ({ item, collection }) => {
           params={queryParams}
           onChange={handleBulkParamsChange}
           onToggle={toggleBulkEdit}
+          onSave={onSave}
         />
       </StyledWrapper>
     );
