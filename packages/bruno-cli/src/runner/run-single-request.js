@@ -71,6 +71,8 @@ const runSingleRequest = async function (
     let shouldStopRunnerExecution = false;
     let preRequestTestResults = [];
     let postResponseTestResults = [];
+    let preRequestTimelines = [];
+    let postResponseTimelines = [];
 
     request = prepareRequest(item, collection);
 
@@ -128,11 +130,13 @@ const runSingleRequest = async function (
           testResults: [],
           preRequestTestResults: result?.results || [],
           postResponseTestResults: [],
+          preRequestTimelines: result?.timelines || [],
           shouldStopRunnerExecution
         };
       }
 
       preRequestTestResults = result?.results || [];
+      preRequestTimelines = result?.timelines || [];
     }
 
     // interpolate variables inside request
@@ -514,6 +518,7 @@ const runSingleRequest = async function (
       }
 
       postResponseTestResults = result?.results || [];
+      postResponseTimelines = result?.timelines || [];
       logResults(postResponseTestResults, 'Post-Response Tests');
     }
 
@@ -533,6 +538,7 @@ const runSingleRequest = async function (
 
     // run tests
     let testResults = [];
+    let testTimelines = [];
     const testFile = get(request, 'tests');
     if (typeof testFile === 'string') {
       const testRuntime = new TestRuntime({ runtime: scriptingConfig?.runtime });
@@ -550,6 +556,7 @@ const runSingleRequest = async function (
         collectionName
       );
       testResults = get(result, 'results', []);
+      testTimelines = get(result, 'timelines', []);
 
       if (result?.nextRequestName !== undefined) {
         nextRequestName = result.nextRequestName;
@@ -589,7 +596,10 @@ const runSingleRequest = async function (
       preRequestTestResults,
       postResponseTestResults,
       nextRequestName: nextRequestName,
-      shouldStopRunnerExecution
+      shouldStopRunnerExecution,
+      preRequestTimelines,
+      postResponseTimelines,
+      testTimelines
     };
   } catch (err) {
     console.log(chalk.red(stripExtension(relativeItemPathname)) + chalk.dim(` (${err.message})`));
@@ -615,7 +625,10 @@ const runSingleRequest = async function (
       assertionResults: [],
       testResults: [],
       preRequestTestResults: [],
-      postResponseTestResults: []
+      postResponseTestResults: [],
+      preRequestTimelines: [],
+      postResponseTimelines: [],
+      testTimelines: []
     };
   }
 };

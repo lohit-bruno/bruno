@@ -264,9 +264,46 @@ const addBruShimToContext = (vm, bru) => {
 
   vm.evalCode(`
     globalThis.bru.sendRequest = async (requestConfig, callback) => {
-      if (!callback) return await globalThis.bru._sendRequest(requestConfig);
+      if (!callback) {
+        const response = await globalThis.bru._sendRequest(requestConfig);
+        
+        // Capture timeline if available
+        if (response && response.timeline) {
+          if (!globalThis.bru._timelines) {
+            globalThis.bru._timelines = [];
+          }
+          globalThis.bru._timelines.push({
+            timestamp: Date.now(),
+            requestConfig: {
+              method: requestConfig.method,
+              url: requestConfig.url,
+              headers: requestConfig.headers
+            },
+            timeline: response.timeline
+          });
+        }
+        
+        return response;
+      }
       try {
         const response = await globalThis.bru._sendRequest(requestConfig);
+        
+        // Capture timeline if available
+        if (response && response.timeline) {
+          if (!globalThis.bru._timelines) {
+            globalThis.bru._timelines = [];
+          }
+          globalThis.bru._timelines.push({
+            timestamp: Date.now(),
+            requestConfig: {
+              method: requestConfig.method,
+              url: requestConfig.url,
+              headers: requestConfig.headers
+            },
+            timeline: response.timeline
+          });
+        }
+        
         try {
           await callback(null, response);
         }
@@ -275,6 +312,23 @@ const addBruShimToContext = (vm, bru) => {
         }
       }
       catch(error) {
+        // Capture timeline from error if available
+        if (error && error.timeline) {
+          if (!globalThis.bru._timelines) {
+            globalThis.bru._timelines = [];
+          }
+          globalThis.bru._timelines.push({
+            timestamp: Date.now(),
+            requestConfig: {
+              method: requestConfig.method,
+              url: requestConfig.url,
+              headers: requestConfig.headers
+            },
+            timeline: error.timeline,
+            error: true
+          });
+        }
+        
         try {
           await callback(JSON.parse(JSON.stringify(error)), null);
         }
@@ -282,6 +336,14 @@ const addBruShimToContext = (vm, bru) => {
           return Promise.reject(err);
         }
       }
+    }
+    
+    globalThis.bru.getTimelines = () => {
+      return globalThis.bru._timelines || [];
+    }
+    
+    globalThis.bru.clearTimelines = () => {
+      globalThis.bru._timelines = [];
     }
   `);
 };

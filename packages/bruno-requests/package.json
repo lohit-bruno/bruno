@@ -32,6 +32,11 @@
   },
   "dependencies": {
     "@types/qs": "^6.9.18",
-    "axios": "^1.9.0"
+    "axios": "^1.9.0",
+    "debug": "^4.4.1",
+    "http-proxy-agent": "^7.0.2",
+    "https-proxy-agent": "^7.0.6",
+    "lodash": "^4.17.21",
+    "socks-proxy-agent": "^8.0.5"
   }
 }

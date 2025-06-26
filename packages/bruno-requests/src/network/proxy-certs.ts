@@ -1,13 +1,28 @@
-const parseUrl = require('url').parse;
-const https = require('https');
+const parseUrl = require('node:url').parse;
+const https = require('node:https');
 const { HttpsProxyAgent } = require('https-proxy-agent');
-const { interpolateString } = require('../ipc/network/interpolate-string');
 const { SocksProxyAgent } = require('socks-proxy-agent');
 const { HttpProxyAgent } = require('http-proxy-agent');
-const { preferencesUtil } = require('../store/preferences');
 const { isEmpty, get, isUndefined, isNull } = require('lodash');
+import { T_LoggerInstance } from '../utils/logger';
+import { 
+  T_HttpsAgentRequestFields, 
+  T_ProxyAgentOptions, 
+  T_SetupProxyAgentsConfig, 
+  T_SocketConnectionOptions,
+  T_SystemProxyEnvVars 
+} from './types';
 
-const DEFAULT_PORTS = {
+const getSystemProxyEnvVariables = (): T_SystemProxyEnvVars => {
+  const { http_proxy, HTTP_PROXY, https_proxy, HTTPS_PROXY, no_proxy, NO_PROXY } = process.env;
+  return {
+    http_proxy: http_proxy || HTTP_PROXY,
+    https_proxy: https_proxy || HTTPS_PROXY,
+    no_proxy: no_proxy || NO_PROXY
+  }; 
+};
+
+const DEFAULT_PORTS: Record<string, number> = {
   ftp: 21,
   gopher: 70,
   http: 80,
@@ -18,7 +33,7 @@ const DEFAULT_PORTS = {
 /**
  * check for proxy bypass, copied form 'proxy-from-env'
  */
-const shouldUseProxy = (url, proxyBypass) => {
+const shouldUseProxy = (url: string, proxyBypass: string): boolean => {
   if (proxyBypass === '*') {
     return false; // Never proxy if wildcard is set.
   }
@@ -28,7 +43,7 @@ const shouldUseProxy = (url, proxyBypass) => {
     return true;
   }
 
-  const parsedUrl = typeof url === 'string' ? parseUrl(url) : url || {};
+  const parsedUrl = parseUrl(url);
   let proto = parsedUrl.protocol;
   let hostname = parsedUrl.host;
   let port = parsedUrl.port;
@@ -40,9 +55,9 @@ const shouldUseProxy = (url, proxyBypass) => {
   // Stripping ports in this way instead of using parsedUrl.hostname to make
   // sure that the brackets around IPv6 addresses are kept.
   hostname = hostname.replace(/:\d*$/, '');
-  port = parseInt(port) || DEFAULT_PORTS[proto] || 0;
+  port = parseInt(port) || DEFAULT_PORTS[proto as keyof typeof DEFAULT_PORTS] || 0;
 
-  return proxyBypass.split(/[,;\s]/).every(function (dontProxyFor) {
+  return proxyBypass.split(/[,;\s]/).every(function (dontProxyFor: string) {
     if (!dontProxyFor) {
       return true; // Skip zero-length hosts.
     }
@@ -73,20 +88,25 @@ const shouldUseProxy = (url, proxyBypass) => {
  * https://github.com/TooTallNate/proxy-agents/issues/194
  */
 class PatchedHttpsProxyAgent extends HttpsProxyAgent {
-  constructor(proxy, opts) {
+  private constructorOpts: any;
+
+  constructor(proxy: string, opts: any) {
     super(proxy, opts);
     this.constructorOpts = opts;
   }
 
-  async connect(req, opts) {
+  async connect(req: any, opts: any): Promise<any> {
     const combinedOpts = { ...this.constructorOpts, ...opts };
     return super.connect(req, combinedOpts);
   }
 }
 
-function createTimelineAgentClass(BaseAgentClass) {
+function createTimelineAgentClass(BaseAgentClass: any, timeline: T_LoggerInstance) {
   return class extends BaseAgentClass {
-    constructor(options, timeline) {
+    private alpnProtocols: string[];
+    private caProvided: boolean;
+
+    constructor(options: T_ProxyAgentOptions) {
       // For proxy agents, the first argument is the proxy URI and the second is options
       if (options?.proxy) {
         const { proxy: proxyUri, ...agentOptions } = options;
@@ -96,23 +116,14 @@ function createTimelineAgentClass(BaseAgentClass) {
           rejectUnauthorized: agentOptions.rejectUnauthorized ?? true,
         };
         super(proxyUri, tlsOptions);
-        this.timeline = Array.isArray(timeline) ? timeline : [];
         this.alpnProtocols = tlsOptions.ALPNProtocols || ['h2', 'http/1.1'];
         this.caProvided = !!tlsOptions.ca;
 
         // Log TLS verification status
-        this.timeline.push({
-          timestamp: new Date(),
-          type: 'info',
-          message: `SSL validation: ${tlsOptions.rejectUnauthorized ? 'enabled' : 'disabled'}`,
-        });
+        timeline.add('info', `SSL validation: ${tlsOptions.rejectUnauthorized ? 'enabled' : 'disabled'}`);
 
         // Log the proxy details
-        this.timeline.push({
-          timestamp: new Date(),
-          type: 'info',
-          message: `Using proxy: ${proxyUri}`,
-        });
+        timeline.add('info', `Using proxy: ${proxyUri}`);
       } else {
         // This is a regular HTTPS agent case
         const tlsOptions = {
@@ -120,81 +131,49 @@ function createTimelineAgentClass(BaseAgentClass) {
           rejectUnauthorized: options.rejectUnauthorized ?? true,
         };   
         super(tlsOptions);
-        this.timeline = Array.isArray(timeline) ? timeline : [];
         this.alpnProtocols = options.ALPNProtocols || ['h2', 'http/1.1'];
         this.caProvided = !!options.ca;
 
         // Log TLS verification status
-        this.timeline.push({
-          timestamp: new Date(),
-          type: 'info',
-          message: `SSL validation: ${tlsOptions.rejectUnauthorized ? 'enabled' : 'disabled'}`,
-        });
+        timeline.add('info', `SSL validation: ${tlsOptions.rejectUnauthorized ? 'enabled' : 'disabled'}`);
       }
     }
 
 
-    createConnection(options, callback) {
+    createConnection(options: T_SocketConnectionOptions, callback: (err?: Error | null, socket?: any) => void) {
       const { host, port } = options;
 
       // Log ALPN protocols offered
       if (this.alpnProtocols && this.alpnProtocols.length > 0) {
-        this.timeline.push({
-          timestamp: new Date(),
-          type: 'tls',
-          message: `ALPN: offers ${this.alpnProtocols.join(', ')}`,
-        });
+        timeline.add('tls', `ALPN: offers ${this.alpnProtocols.join(', ')}`);
       }
 
       // Log CAfile and CApath (if possible)
       if (this.caProvided) {
-        this.timeline.push({
-          timestamp: new Date(),
-          type: 'tls',
-          message: `CA certificates provided`,
-        });
+        timeline.add('tls', `CA certificates provided`);
       } else {
-        this.timeline.push({
-          timestamp: new Date(),
-          type: 'tls',
-          message: `Using system default CA certificates`,
-        });
+        timeline.add('tls', `Using system default CA certificates`);
       }
 
       // Log "Trying host:port..."
-      this.timeline.push({
-        timestamp: new Date(),
-        type: 'info',
-        message: `Trying ${host}:${port}...`,
-      });
+      timeline.add('info', `Trying ${host}:${port}...`);
 
-      let socket;
+      let socket: any;
       try {
         socket = super.createConnection(options, callback);
-      } catch (error) {
-        this.timeline.push({
-          timestamp: new Date(),
-          type: 'error',
-          message: `Error creating connection: ${error.message}`,
-        });
-        error.timeline = this.timeline;
-        throw error;
+      } catch (error: unknown) {
+        const err = error as Error;
+        timeline.add('error', `Error creating connection: ${err.message}`);
+        (err as any).timeline = timeline.getAll();
+        throw err;
       }
 
       // Attach event listeners to the socket
-      socket?.on('lookup', (err, address, family, host) => {
+      socket?.on('lookup', (err: Error | null, address: string, family: string | number, host: string) => {
         if (err) {
-          this.timeline.push({
-            timestamp: new Date(),
-            type: 'error',
-            message: `DNS lookup error for ${host}: ${err.message}`,
-          });
+          timeline.add('error', `DNS lookup error for ${host}: ${err.message}`);
         } else {
-          this.timeline.push({
-            timestamp: new Date(),
-            type: 'info',
-            message: `DNS lookup: ${host} -> ${address}`,
-          });
+          timeline.add('info', `DNS lookup: ${host} -> ${address}`);
         }
       });
 
@@ -202,11 +181,7 @@ function createTimelineAgentClass(BaseAgentClass) {
         const address = socket.remoteAddress || host;
         const remotePort = socket.remotePort || port;
 
-        this.timeline.push({
-          timestamp: new Date(),
-          type: 'info',
-          message: `Connected to ${host} (${address}) port ${remotePort}`,
-        });
+        timeline.add('info', `Connected to ${host} (${address}) port ${remotePort}`);
       });
 
       socket?.on('secureConnect', () => {
@@ -214,79 +189,39 @@ function createTimelineAgentClass(BaseAgentClass) {
         const cipher = socket.getCipher();
         const cipherSuite = cipher ? `${cipher.name} (${cipher.version})` : 'Unknown cipher';
 
-        this.timeline.push({
-          timestamp: new Date(),
-          type: 'tls',
-          message: `SSL connection using ${protocol} / ${cipherSuite}`,
-        });
+        timeline.add('tls', `SSL connection using ${protocol} / ${cipherSuite}`);
 
         // ALPN protocol
         const alpnProtocol = socket.alpnProtocol || 'None';
-        this.timeline.push({
-          timestamp: new Date(),
-          type: 'tls',
-          message: `ALPN: server accepted ${alpnProtocol}`,
-        });
+        timeline.add('tls', `ALPN: server accepted ${alpnProtocol}`);
 
         // Server certificate
         const cert = socket.getPeerCertificate(true);
         if (cert) {
-          this.timeline.push({
-            timestamp: new Date(),
-            type: 'tls',
-            message: `Server certificate:`,
-          });
+          timeline.add('tls', `Server certificate:`);
           if (cert.subject) {
-            this.timeline.push({
-              timestamp: new Date(),
-              type: 'tls',
-              message: ` subject: ${Object.entries(cert.subject).map(([k, v]) => `${k}=${v}`).join(', ')}`,
-            });
+            timeline.add('tls', ` subject: ${Object.entries(cert.subject).map(([k, v]) => `${k}=${v}`).join(', ')}`);
           }
           if (cert.valid_from) {
-            this.timeline.push({
-              timestamp: new Date(),
-              type: 'tls',
-              message: ` start date: ${cert.valid_from}`,
-            });
+            timeline.add('tls', ` start date: ${cert.valid_from}`);
           }
           if (cert.valid_to) {
-            this.timeline.push({
-              timestamp: new Date(),
-              type: 'tls',
-              message: ` expire date: ${cert.valid_to}`,
-            });
+            timeline.add('tls', ` expire date: ${cert.valid_to}`);
           }
           if (cert.subjectaltname) {
-            this.timeline.push({
-              timestamp: new Date(),
-              type: 'tls',
-              message: ` subjectAltName: ${cert.subjectaltname}`,
-            });
+            timeline.add('tls', ` subjectAltName: ${cert.subjectaltname}`);
           }
           if (cert.issuer) {
-            this.timeline.push({
-              timestamp: new Date(),
-              type: 'tls',
-              message: ` issuer: ${Object.entries(cert.issuer).map(([k, v]) => `${k}=${v}`).join(', ')}`,
-            });
+            timeline.add('tls', ` issuer: ${Object.entries(cert.issuer).map(([k, v]) => `${k}=${v}`).join(', ')}`);
           }
 
           // SSL certificate verify ok
-          this.timeline.push({
-            timestamp: new Date(),
-            type: 'tls',
-            message: `SSL certificate verify ok.`,
-          });
+          timeline.add('tls', `SSL certificate verify ok.`);
         }
       });
 
-      socket?.on('error', (err) => {
-        this.timeline.push({
-          timestamp: new Date(),
-          type: 'error',
-          message: `Socket error: ${err.message}`,
-        });
+      socket?.on('error', (err: Error) => {
+        timeline.add('error', `Socket error: ${err.message}`);
       });
 
       return socket;
@@ -294,15 +229,15 @@ function createTimelineAgentClass(BaseAgentClass) {
   };
 }
 
-function setupProxyAgents({
+export function setupProxyAgents({
   requestConfig,
   proxyMode = 'off',
   proxyConfig,
   httpsAgentRequestFields,
-  timeline,
-}) {
+  timeline
+}: T_SetupProxyAgentsConfig): void {
   // Ensure TLS options are properly set
-  const tlsOptions = {
+  const tlsOptions: T_HttpsAgentRequestFields = {
     ...httpsAgentRequestFields,
     // Enable all secure protocols by default
     secureProtocol: undefined,
@@ -312,8 +247,9 @@ function setupProxyAgents({
   };
 
   if (proxyMode === 'on') {
-    const shouldProxy = shouldUseProxy(requestConfig.url, get(proxyConfig, 'bypassProxy', ''));
+    const shouldProxy = shouldUseProxy(requestConfig.url!, get(proxyConfig, 'bypassProxy', ''));
     if (shouldProxy) {
+      // Use already-interpolated values from proxyConfig
       const proxyProtocol = get(proxyConfig, 'protocol', '');
       const proxyHostname = get(proxyConfig, 'hostname', '');
       const proxyPort = get(proxyConfig, 'port', '');
@@ -321,7 +257,7 @@ function setupProxyAgents({
       const socksEnabled = proxyProtocol.includes('socks');
 
       let uriPort = isUndefined(proxyPort) || isNull(proxyPort) ? '' : `:${proxyPort}`;
-      let proxyUri;
+      let proxyUri: string;
       if (proxyAuthEnabled) {
         const proxyAuthUsername = encodeURIComponent(get(proxyConfig, 'auth.username', ''));
         const proxyAuthPassword = encodeURIComponent(get(proxyConfig, 'auth.password', ''));
@@ -331,25 +267,24 @@ function setupProxyAgents({
       }
 
       if (socksEnabled) {
-        const TimelineSocksProxyAgent = createTimelineAgentClass(SocksProxyAgent);
-        requestConfig.httpAgent = new TimelineSocksProxyAgent({ proxy: proxyUri }, timeline);
-        requestConfig.httpsAgent = new TimelineSocksProxyAgent({ proxy: proxyUri, ...tlsOptions }, timeline);
+        const TimelineSocksProxyAgent = createTimelineAgentClass(SocksProxyAgent, timeline);
+        requestConfig.httpAgent = new TimelineSocksProxyAgent({ proxy: proxyUri, ...tlsOptions });
+        requestConfig.httpsAgent = new TimelineSocksProxyAgent({ proxy: proxyUri, ...tlsOptions });
       } else {
-        const TimelineHttpsProxyAgent = createTimelineAgentClass(PatchedHttpsProxyAgent);
+        const TimelineHttpsProxyAgent = createTimelineAgentClass(PatchedHttpsProxyAgent, timeline);
         requestConfig.httpAgent = new HttpProxyAgent(proxyUri); // For http, no need for timeline
         requestConfig.httpsAgent = new TimelineHttpsProxyAgent(
-          { proxy: proxyUri, ...tlsOptions },
-          timeline
+          { proxy: proxyUri, ...tlsOptions }
         );
       }
     } else {
       // If proxy should not be used, set default HTTPS agent
-      const TimelineHttpsAgent = createTimelineAgentClass(https.Agent);
-      requestConfig.httpsAgent = new TimelineHttpsAgent(tlsOptions, timeline);
+      const TimelineHttpsAgent = createTimelineAgentClass(https.Agent, timeline);
+      requestConfig.httpsAgent = new TimelineHttpsAgent(tlsOptions);
     }
   } else if (proxyMode === 'system') {
-    const { http_proxy, https_proxy, no_proxy } = preferencesUtil.getSystemProxyEnvVariables();
-    const shouldUseSystemProxy = shouldUseProxy(requestConfig.url, no_proxy || '');
+    const { http_proxy, https_proxy, no_proxy } = getSystemProxyEnvVariables();
+    const shouldUseSystemProxy = shouldUseProxy(requestConfig.url!, no_proxy || '');
     if (shouldUseSystemProxy) {
       try {
         if (http_proxy?.length) {
@@ -362,28 +297,20 @@ function setupProxyAgents({
       try {
         if (https_proxy?.length) {
           new URL(https_proxy);
-          const TimelineHttpsProxyAgent = createTimelineAgentClass(PatchedHttpsProxyAgent);
+          const TimelineHttpsProxyAgent = createTimelineAgentClass(PatchedHttpsProxyAgent, timeline);
           requestConfig.httpsAgent = new TimelineHttpsProxyAgent(
-            { proxy: https_proxy,...tlsOptions },
-            timeline
+            { proxy: https_proxy, ...tlsOptions }
           );
         }
       } catch (error) {
         throw new Error('Invalid system https_proxy');
       }
     } else {
-      const TimelineHttpsAgent = createTimelineAgentClass(https.Agent);
-      requestConfig.httpsAgent = new TimelineHttpsAgent(tlsOptions, timeline);
+      const TimelineHttpsAgent = createTimelineAgentClass(https.Agent, timeline);
+      requestConfig.httpsAgent = new TimelineHttpsAgent(tlsOptions);
     }
   } else {
-    const TimelineHttpsAgent = createTimelineAgentClass(https.Agent);
-    requestConfig.httpsAgent = new TimelineHttpsAgent(tlsOptions, timeline);
+    const TimelineHttpsAgent = createTimelineAgentClass(https.Agent, timeline);
+    requestConfig.httpsAgent = new TimelineHttpsAgent(tlsOptions);
   }
 }
-
-
-module.exports = {
-  shouldUseProxy,
-  PatchedHttpsProxyAgent,
-  setupProxyAgents
-};

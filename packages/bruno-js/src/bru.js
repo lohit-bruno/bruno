@@ -1,11 +1,11 @@
 const { cloneDeep } = require('lodash');
 const { interpolate: _interpolate } = require('@usebruno/common');
-const { sendRequest } = require('@usebruno/requests').scripting;
+const { createSendRequestHandler } = require('@usebruno/requests').scripting;
 
 const variableNameRegex = /^[\w-.]*$/;
 
 class Bru {
-  constructor(envVariables, runtimeVariables, processEnvVars, collectionPath, collectionVariables, folderVariables, requestVariables, globalEnvironmentVariables, oauth2CredentialVariables, collectionName) {
+  constructor(envVariables, runtimeVariables, processEnvVars, collectionPath, collectionVariables, folderVariables, requestVariables, globalEnvironmentVariables, oauth2CredentialVariables, collectionName, certsAndProxyConfig) {
     this.envVariables = envVariables || {};
     this.runtimeVariables = runtimeVariables || {};
     this.processEnvVars = cloneDeep(processEnvVars || {});
@@ -16,7 +16,68 @@ class Bru {
     this.oauth2CredentialVariables = oauth2CredentialVariables || {};
     this.collectionPath = collectionPath;
     this.collectionName = collectionName;
-    this.sendRequest = sendRequest;
+    
+    // Array to store timeline entries from sendRequest calls
+    this.timelines = [];
+    
+    // Create wrapped sendRequest handler that captures timeline
+    const originalSendRequest = createSendRequestHandler({ certsAndProxyConfig });
+    this.sendRequest = async (requestConfig, callback) => {
+      try {
+        const response = await originalSendRequest(requestConfig, callback);
+        
+        // Capture timeline if available
+        if (response?.config?.timeline) {
+          this.timelines.push({
+            timestamp: Date.now(),
+            request: requestConfig.url ? {
+              method: requestConfig.method,
+              url: requestConfig.url,
+              headers: requestConfig.headers
+            } : {
+              url: requestConfig,
+              method: 'GET'
+            },
+            response: {
+              status: response.status,
+              statusText: response.statusText,
+              headers: response.headers,
+              data: response.data,
+              timeline: response.config.timeline
+            }
+          });
+        }
+        
+        return response;
+      } catch (error) {
+        console.log("bru send error", requestConfig);
+        // Capture timeline from error if available
+        if (error?.config?.timeline) {
+          this.timelines.push({
+            timestamp: Date.now(),
+            request: requestConfig.url ? {
+              method: requestConfig.method,
+              url: requestConfig.url,
+              headers: requestConfig.headers
+            } : {
+              url: requestConfig,
+              method: 'GET'
+            },
+            response: {
+              status: error.response?.status,
+              statusText: error.response?.statusText,
+              headers: error.response?.headers,
+              data: error.response?.data,
+              error: error.message,
+              timeline: error.config.timeline
+            },
+            error: true
+          });
+        }
+        throw error;
+      }
+    };
+    
     this.runner = {
       skipRequest: () => {
         this.skipRequest = true;
@@ -166,6 +227,14 @@ class Bru {
 
   getCollectionName() {
     return this.collectionName;
+  }
+
+  getTimelines() {
+    return [...this.timelines]; // Return a copy to prevent external modification
+  }
+
+  clearTimelines() {
+    this.timelines = [];
   }
 }
 
