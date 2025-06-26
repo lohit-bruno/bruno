@@ -90,7 +90,12 @@ const RequestHeaders = ({ item, collection }) => {
   if (bulkEdit) {
     return (
       <StyledWrapper className="w-full mt-3">
-        <BulkEditCodeEditor params={headers} onChange={handleBulkHeadersChange} onToggle={toggleBulkEdit} />
+        <BulkEditCodeEditor
+          params={headers}
+          onChange={handleBulkHeadersChange}
+          onToggle={toggleBulkEdit}
+          onSave={onSave}
+        />
       </StyledWrapper>
     );
   }
