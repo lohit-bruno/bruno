@@ -4,7 +4,7 @@ import { useTheme } from 'providers/Theme';
 import { useSelector } from 'react-redux';
 import { parseBulkKeyValue, serializeBulkKeyValue } from 'utils/common/bulkKeyValueUtils';
 
-const BulkEditCodeEditor = ({ params, onChange, onToggle, onSave }) => {
+const BulkEditCodeEditor = ({ params, onChange, onToggle, onSave, onRun }) => {
   const preferences = useSelector((state) => state.app.preferences);
   const { displayedTheme } = useTheme();
 
@@ -25,6 +25,7 @@ const BulkEditCodeEditor = ({ params, onChange, onToggle, onSave }) => {
           value={parsedParams}
           onEdit={handleEdit}
           onSave={onSave}
+          onRun={onRun}
         />
       </div>
       <div className="flex btn-action justify-between items-center mt-3">

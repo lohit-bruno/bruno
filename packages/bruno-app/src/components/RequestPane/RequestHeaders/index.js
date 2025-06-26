@@ -95,6 +95,7 @@ const RequestHeaders = ({ item, collection }) => {
           onChange={handleBulkHeadersChange}
           onToggle={toggleBulkEdit}
           onSave={onSave}
+          onRun={handleRun}
         />
       </StyledWrapper>
     );
