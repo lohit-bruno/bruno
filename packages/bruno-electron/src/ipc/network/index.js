@@ -698,7 +698,6 @@ const registerNetworkIpc = (mainWindow) => {
             timeline: error.timeline
           };
         }
-
         if (error?.response) {
           response = error.response;
 
@@ -706,6 +705,8 @@ const registerNetworkIpc = (mainWindow) => {
           responseTime = response.headers.get('request-duration');
           response.headers.delete('request-duration');
         } else {
+          await executeRequestOnFailHandler(request, error);
+
           // if it's not a network error, don't continue
           // we are not rejecting the promise here and instead returning a response object with `error` which is handled in the `send-http-request` invocation
           // timeline prop won't be accessible in the usual way in the renderer process if we reject the promise
@@ -1173,7 +1174,12 @@ const registerNetworkIpc = (mainWindow) => {
                 ...eventData
               });
             } catch (error) {
-              if (error?.response && !axios.isCancel(error)) {
+              // Skip further processing if request was cancelled
+              if (axios.isCancel(error)) {
+                throw Promise.reject(error);
+              }
+
+              if (error?.response) {
                 const { data, dataBuffer } = parseDataFromResponse(error.response);
                 error.response.data = data;
 
@@ -1197,6 +1203,8 @@ const registerNetworkIpc = (mainWindow) => {
                   ...eventData
                 });
               } else {
+                await executeRequestOnFailHandler(request, error);
+
                 // if it's not a network error, don't continue
                 throw Promise.reject(error);
               }
@@ -1442,7 +1450,27 @@ const registerNetworkIpc = (mainWindow) => {
   });
 };
 
+/**
+ * Executes the custom error handler if it exists on the request
+ * @param {Object} request - The request object that may contain an onFailHandler
+ * @param {Error} error - The error that occurred
+ */
+const executeRequestOnFailHandler = async (request, error) => {
+  if (!request || typeof request.onFailHandler !== 'function') {
+    return;
+  }
+
+  try {
+    await request.onFailHandler(error);
+  } catch (handlerError) {
+    console.error('Error executing onFail handler', handlerError);
+    // @TODO: This is a temporary solution to display the error message in the response pane. Revisit and handle properly.
+    error.message = `1. Request failed: ${error.message || 'Error occured while executing the request!'}\n2. Error executing onFail handler: ${handlerError.message || 'Unknown error'}`;
+  }
+};
+
 module.exports = registerNetworkIpc;
 module.exports.configureRequest = configureRequest;
 module.exports.getCertsAndProxyConfig = getCertsAndProxyConfig;
 module.exports.fetchGqlSchemaHandler = fetchGqlSchemaHandler;
+module.exports.executeRequestOnFailHandler = executeRequestOnFailHandler;
