@@ -220,3 +220,25 @@ export const formatSize = (bytes) => {
 
   return (bytes / (1024 * 1024 * 1024)).toFixed(1) + 'GB';
 }
+
+export const sortByNameThenSequence = items => {
+  const isSeqValid = seq => Number.isFinite(seq) && Number.isInteger(seq) && seq > 0;
+
+  // Sort folders alphabetically by name
+  const alphabeticallySorted = [...items].sort((a, b) => a.name.localeCompare(b.name));
+
+  // Extract folders without 'seq'
+  const withoutSeq = alphabeticallySorted.filter(f => !isSeqValid(f['seq']));
+
+  // Extract folders with 'seq' and sort them by 'seq'
+  const withSeq = alphabeticallySorted.filter(f => isSeqValid(f['seq'])).sort((a, b) => (a.seq - b.seq) > 0 ? 1 : -1);
+
+  const sortedItems = withoutSeq;
+
+  // Insert folders with 'seq' at their specified positions
+  withSeq.forEach((item) => {
+    withoutSeq.splice(item.seq - 1, 0, item);
+  });
+
+  return sortedItems;
+};

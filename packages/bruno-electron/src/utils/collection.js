@@ -346,8 +346,8 @@ const sortCollection = (collection) => {
   let folderItems = filter(items, (item) => item.type === 'folder');
   let requestItems = filter(items, (item) => item.type !== 'folder');
 
-  folderItems = folderItems.sort((a, b) => a.seq - b.seq);
-  requestItems = requestItems.sort((a, b) => a.seq - b.seq);
+  folderItems = sortByNameThenSequence(folderItems);
+  requestItems = sortByNameThenSequence(requestItems);
 
   collection.items = folderItems.concat(requestItems);
 
@@ -361,8 +361,8 @@ const sortFolder = (folder = {}) => {
   let folderItems = filter(items, (item) => item.type === 'folder');
   let requestItems = filter(items, (item) => item.type !== 'folder');
 
-  folderItems = folderItems.sort((a, b) => a.seq - b.seq);
-  requestItems = requestItems.sort((a, b) => a.seq - b.seq);
+  folderItems = sortByNameThenSequence(folderItems);
+  requestItems = sortByNameThenSequence(requestItems);
 
   folder.items = folderItems.concat(requestItems);
 
@@ -467,6 +467,28 @@ const mergeAuth = (collection, request, requestTreePath) => {
   }
 };
 
+const sortByNameThenSequence = items => {
+  const isSeqValid = seq => Number.isFinite(seq) && Number.isInteger(seq) && seq > 0;
+
+  // Sort folders alphabetically by name
+  const alphabeticallySorted = [...items].sort((a, b) => a.name.localeCompare(b.name));
+
+  // Extract folders without 'seq'
+  const withoutSeq = alphabeticallySorted.filter(f => !isSeqValid(f['seq']));
+
+  // Extract folders with 'seq' and sort them by 'seq'
+  const withSeq = alphabeticallySorted.filter(f => isSeqValid(f['seq'])).sort((a, b) => (a.seq - b.seq) > 0 ? 1 : -1);
+
+  const sortedItems = withoutSeq;
+
+  // Insert folders with 'seq' at their specified positions
+  withSeq.forEach((item) => {
+    withoutSeq.splice(item.seq - 1, 0, item);
+  });
+
+  return sortedItems;
+};
+
 module.exports = {
   mergeHeaders,
   mergeVars,
@@ -487,5 +509,6 @@ module.exports = {
   sortFolder,
   getAllRequestsInFolderRecursively,
   getEnvVars,
-  getFormattedCollectionOauth2Credentials
+  getFormattedCollectionOauth2Credentials,
+  sortByNameThenSequence
 };

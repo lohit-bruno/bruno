@@ -25,6 +25,7 @@ import { areItemsLoading } from 'utils/collections';
 import { scrollToTheActiveTab } from 'utils/tabs';
 import ShareCollection from 'components/ShareCollection/index';
 import { CollectionItemDragPreview } from './CollectionItem/CollectionItemDragPreview/index';
+import { sortByNameThenSequence } from 'utils/common/index';
 
 const Collection = ({ collection, searchText }) => {
   const [showNewFolderModal, setShowNewFolderModal] = useState(false);
@@ -179,13 +180,8 @@ const Collection = ({ collection, searchText }) => {
       'collection-focused-in-tab': isCollectionFocused
     });
 
-  // we need to sort request items by seq property
-  const sortItemsBySequence = (items = []) => {
-    return items.sort((a, b) => a.seq - b.seq);
-  };
-
-  const requestItems = sortItemsBySequence(filter(collection.items, (i) => isItemARequest(i)));
-  const folderItems = sortItemsBySequence(filter(collection.items, (i) => isItemAFolder(i)));
+  const requestItems = sortByNameThenSequence(filter(collection.items, (i) => isItemARequest(i)));
+  const folderItems = sortByNameThenSequence(filter(collection.items, (i) => isItemAFolder(i)));
 
   return (
     <StyledWrapper className="flex flex-col">
