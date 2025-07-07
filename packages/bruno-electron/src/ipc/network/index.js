@@ -90,38 +90,115 @@ const getCertsAndProxyConfig = async ({
   // client certificate config
   const clientCertConfig = get(brunoConfig, 'clientCertificates.certs', []);
 
+  // Helper function to safely escape regex and validate domain
+  const createDomainRegex = (domain) => {
+    if (!domain || typeof domain !== 'string') {
+      throw new Error('Invalid domain format');
+    }
+    
+    // Validate domain format (basic validation)
+    const domainRegex = /^[a-zA-Z0-9*.-]+$/;
+    if (!domainRegex.test(domain)) {
+      throw new Error('Invalid domain format');
+    }
+    
+    // Safely escape regex metacharacters
+    const escaped = domain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Then replace escaped wildcards with regex equivalents
+    const pattern = escaped.replace(/\\\*/g, '.*');
+    
+    return new RegExp(`^https://${pattern}$`);
+  };
+
+  // Helper function to validate file paths
+  const validateFilePath = (filePath, collectionPath) => {
+    if (!filePath) {
+      throw new Error('File path is required');
+    }
+    
+    const resolvedPath = path.isAbsolute(filePath) 
+      ? filePath 
+      : path.join(collectionPath, filePath);
+    
+    // Check if the resolved path is within the collection directory
+    if (!path.isAbsolute(filePath)) {
+      const relativePath = path.relative(collectionPath, resolvedPath);
+      if (relativePath.startsWith('..') || path.isAbsolute(relativePath)) {
+        throw new Error(`Path traversal detected: ${filePath}`);
+      }
+    }
+    
+    return resolvedPath;
+  };
+
+  // Improved certificate handling
   for (let clientCert of clientCertConfig) {
     const domain = interpolateString(clientCert?.domain, interpolationOptions);
     const type = clientCert?.type || 'cert';
-    if (domain) {
-      const hostRegex = '^https:\\/\\/' + domain.replaceAll('.', '\\.').replaceAll('*', '.*');
-      if (request.url.match(hostRegex)) {
-        if (type === 'cert') {
-          try {
-            let certFilePath = interpolateString(clientCert?.certFilePath, interpolationOptions);
-            certFilePath = path.isAbsolute(certFilePath) ? certFilePath : path.join(collectionPath, certFilePath);
-            let keyFilePath = interpolateString(clientCert?.keyFilePath, interpolationOptions);
-            keyFilePath = path.isAbsolute(keyFilePath) ? keyFilePath : path.join(collectionPath, keyFilePath);
-
-            httpsAgentRequestFields['cert'] = fs.readFileSync(certFilePath);
-            httpsAgentRequestFields['key'] = fs.readFileSync(keyFilePath);
-          } catch (err) {
-            console.error('Error reading cert/key file', err);
-            throw new Error('Error reading cert/key file' + err);
-          }
-        } else if (type === 'pfx') {
-          try {
-            let pfxFilePath = interpolateString(clientCert?.pfxFilePath, interpolationOptions);
-            pfxFilePath = path.isAbsolute(pfxFilePath) ? pfxFilePath : path.join(collectionPath, pfxFilePath);
-            httpsAgentRequestFields['pfx'] = fs.readFileSync(pfxFilePath);
-          } catch (err) {
-            console.error('Error reading pfx file', err);
-            throw new Error('Error reading pfx file' + err);
-          }
-        }
-        httpsAgentRequestFields['passphrase'] = interpolateString(clientCert.passphrase, interpolationOptions);
-        break;
+    
+    if (!domain) {
+      continue;
+    }
+    
+    try {
+      const domainRegex = createDomainRegex(domain);
+      if (!domainRegex.test(request.url)) {
+        continue;
       }
+      
+      if (type === 'cert') {
+        if (!clientCert?.certFilePath || !clientCert?.keyFilePath) {
+          throw new Error(`Missing required cert/key file paths for domain: ${domain}`);
+        }
+        
+        const certFilePath = validateFilePath(
+          interpolateString(clientCert.certFilePath, interpolationOptions),
+          collectionPath
+        );
+        const keyFilePath = validateFilePath(
+          interpolateString(clientCert.keyFilePath, interpolationOptions),
+          collectionPath
+        );
+        
+        // Check file existence
+        if (!fs.existsSync(certFilePath)) {
+          throw new Error(`Certificate file not found: ${certFilePath}`);
+        }
+        if (!fs.existsSync(keyFilePath)) {
+          throw new Error(`Key file not found: ${keyFilePath}`);
+        }
+        
+        httpsAgentRequestFields['cert'] = fs.readFileSync(certFilePath);
+        httpsAgentRequestFields['key'] = fs.readFileSync(keyFilePath);
+        
+      } else if (type === 'pfx') {
+        if (!clientCert?.pfxFilePath) {
+          throw new Error(`Missing required PFX file path for domain: ${domain}`);
+        }
+        
+        const pfxFilePath = validateFilePath(
+          interpolateString(clientCert.pfxFilePath, interpolationOptions),
+          collectionPath
+        );
+        
+        if (!fs.existsSync(pfxFilePath)) {
+          throw new Error(`PFX file not found: ${pfxFilePath}`);
+        }
+        
+        httpsAgentRequestFields['pfx'] = fs.readFileSync(pfxFilePath);
+      }
+      
+      // Only set passphrase if it exists and is non-empty
+      const passphrase = interpolateString(clientCert.passphrase, interpolationOptions);
+      if (passphrase && passphrase.trim()) {
+        httpsAgentRequestFields['passphrase'] = passphrase;
+      }
+      
+      break;
+      
+    } catch (err) {
+      console.error(`Error processing client certificate for domain ${domain}:`, err);
+      throw new Error(`Client certificate error for domain ${domain}: ${err.message}`);
     }
   }
 
