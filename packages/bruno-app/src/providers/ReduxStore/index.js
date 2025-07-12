@@ -1,4 +1,5 @@
 import { configureStore } from '@reduxjs/toolkit';
+import initialState from './initial.json';
 import tasksMiddleware from './middlewares/tasks/middleware';
 import debugMiddleware from './middlewares/debug/middleware';
 import appReducer from './slices/app';
@@ -17,6 +18,7 @@ if (isDevEnv()) {
   middleware = [...middleware, debugMiddleware.middleware];
 }
 
+
 export const store = configureStore({
   reducer: {
     app: appReducer,
@@ -25,7 +27,8 @@ export const store = configureStore({
     notifications: notificationsReducer,
     globalEnvironments: globalEnvironmentsReducer
   },
-  middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(middleware)
+  middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(middleware),
+  preloadedState: initialState
 });
 
 export default store;

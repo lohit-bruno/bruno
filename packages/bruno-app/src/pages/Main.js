@@ -25,6 +25,24 @@ import '@fontsource/inter/900.css';
 import { setupPolyfills } from 'utils/common/setupPolyfills';
 setupPolyfills();
 
+window.ipcRenderer = {
+  invoke: async (channel, ...args) => { return {} },
+  on: (channel, handler) => {
+    // Deliberately strip event as it includes `sender`
+    const subscription = (event, ...args) => handler(...args);
+    // ipcRenderer.on(channel, subscription);
+
+    return () => {
+      // ipcRenderer.removeListener(channel, subscription);
+    };
+  },
+  getFilePath (file) {
+    // const path = webUtils.getPathForFile(file)
+    // return path;
+    return 'path';
+  }
+};
+
 function Main({ children }) {
   if (!window.ipcRenderer) {
     return (

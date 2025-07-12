@@ -1,0 +1,514 @@
+{
+    "app": {
+        "isDragging": false,
+        "idbConnectionReady": false,
+        "leftSidebarWidth": 222,
+        "screenWidth": 643,
+        "showHomePage": false,
+        "showPreferences": false,
+        "isEnvironmentSettingsModalOpen": false,
+        "preferences": {
+            "request": {
+                "sslVerification": false,
+                "customCaCertificate": {
+                    "enabled": false,
+                    "filePath": "/Users/lohit/Documents/code/_bruno/bruno_collections/bruno_testbench/file.json"
+                },
+                "keepDefaultCaCertificates": {
+                    "enabled": true
+                },
+                "storeCookies": true,
+                "sendCookies": true,
+                "timeout": 0
+            },
+            "font": {
+                "codeFont": "default",
+                "codeFontSize": 14
+            },
+            "proxy": {
+                "mode": "system",
+                "protocol": "http",
+                "hostname": "",
+                "port": null,
+                "auth": {
+                    "enabled": false,
+                    "username": "",
+                    "password": ""
+                },
+                "bypassProxy": ""
+            },
+            "layout": {
+                "responsePaneOrientation": "horizontal"
+            },
+            "features": {
+                "terminal": true,
+                "apiSpec": false,
+                "fileExplorer": true,
+                "git": true,
+                "brunoJson": false
+            },
+            "secretsProviders": [
+                {
+                    "uid": "h8PVIwEnJWA81Kq2rJJjr",
+                    "name": "aws",
+                    "type": "aws-secrets-manager",
+                    "awsConfig": {
+                        "accessKeyId": "$00:763130fc83f3cc9f61d717795db7ee491a5284f0a84890ed91396aa52789abb0c2c5a1",
+                        "secretAccessKey": "$00:7631302e161a4ef3c060556c5edb79e0660a18bfc734f2e1f47785b646937a85e9ea05591cd4aa9080275ca49986a490d72287",
+                        "region": "us-east-1"
+                    }
+                }
+            ],
+            "awsConfig": {
+                "enabled": false,
+                "accessKeyId": "",
+                "secretAccessKey": "",
+                "region": ""
+            },
+            "azureConfig": {
+                "enabled": false,
+                "tenantId": "",
+                "clientId": "",
+                "clientSecret": ""
+            },
+            "autoupdate": {
+                "downloadUpdates": true
+            },
+            "license": {
+                "proxy": {
+                    "auth": {}
+                }
+            }
+        },
+        "generateCode": {
+            "mainLanguage": "Shell",
+            "library": "curl",
+            "shouldInterpolate": true
+        },
+        "cookies": [],
+        "taskQueue": [],
+        "systemProxyEnvVariables": {}
+    },
+    "collections": {
+        "collections": [
+            {
+                "version": "1",
+                "uid": "puy5t8000000000000000",
+                "name": "collection_runner_tags",
+                "pathname": "/Users/lohit/Documents/code/_bruno/bruno_collections/collection_runner_tags",
+                "items": [],
+                "runtimeVariables": {},
+                "brunoConfig": {
+                    "version": "1",
+                    "name": "collection_runner_tags",
+                    "type": "collection",
+                    "ignore": [
+                        "node_modules",
+                        ".git"
+                    ],
+                    "size": 0.0018262863159179688,
+                    "filesCount": 10
+                },
+                "securityConfig": {
+                    "jsSandboxMode": "safe"
+                },
+                "settingsSelectedTab": "overview",
+                "folderLevelSettingsSelectedTab": {},
+                "mountStatus": "unmounted",
+                "importedAt": 1752330169955,
+                "lastAction": null,
+                "collapsed": true
+            },
+            {
+                "version": "1",
+                "uid": "5etvur000000000000000",
+                "name": "collection_seq",
+                "pathname": "/Users/lohit/Documents/code/_bruno/bruno_collections/collection_seq",
+                "items": [
+                    {
+                        "uid": "xtsTfeSySLKqJuyPnMcu9",
+                        "pathname": "/Users/lohit/Documents/code/_bruno/bruno_collections/collection_seq/folder_1",
+                        "name": "folder_1",
+                        "seq": 1,
+                        "filename": "folder_1",
+                        "collapsed": true,
+                        "type": "folder",
+                        "items": [],
+                        "depth": 1
+                    },
+                    {
+                        "uid": "F8NF2vffTiD3deTRXR0jY",
+                        "pathname": "/Users/lohit/Documents/code/_bruno/bruno_collections/collection_seq/folder_2",
+                        "name": "folder_2",
+                        "seq": 1,
+                        "filename": "folder_2",
+                        "collapsed": true,
+                        "type": "folder",
+                        "items": [],
+                        "depth": 1
+                    },
+                    {
+                        "uid": "Yim4ihLaaGBICxHljkZ9x",
+                        "pathname": "/Users/lohit/Documents/code/_bruno/bruno_collections/collection_seq/folder_3",
+                        "name": "folder_3",
+                        "seq": 1,
+                        "filename": "folder_3",
+                        "collapsed": true,
+                        "type": "folder",
+                        "items": [],
+                        "depth": 1
+                    },
+                    {
+                        "uid": "8PAzJiwpXvqF93cLny8fC",
+                        "pathname": "/Users/lohit/Documents/code/_bruno/bruno_collections/collection_seq/folder_4",
+                        "name": "folder_4",
+                        "seq": 1,
+                        "filename": "folder_4",
+                        "collapsed": true,
+                        "type": "folder",
+                        "items": [],
+                        "depth": 1
+                    },
+                    {
+                        "uid": "FYGp0BJGTcMw5j9j9cbSc",
+                        "pathname": "/Users/lohit/Documents/code/_bruno/bruno_collections/collection_seq/folder_5",
+                        "name": "folder_5",
+                        "seq": 1,
+                        "filename": "folder_5",
+                        "collapsed": true,
+                        "type": "folder",
+                        "items": [],
+                        "depth": 1
+                    },
+                    {
+                        "uid": "95dAVlbgNrWEvfXKX7J4z",
+                        "pathname": "/Users/lohit/Documents/code/_bruno/bruno_collections/collection_seq/folder_6",
+                        "name": "folder_6",
+                        "seq": 6,
+                        "filename": "folder_6",
+                        "collapsed": true,
+                        "type": "folder",
+                        "items": [],
+                        "depth": 1,
+                        "root": {
+                            "request": {
+                                "headers": [],
+                                "auth": {
+                                    "mode": "inherit"
+                                },
+                                "script": {},
+                                "vars": {},
+                                "tests": ""
+                            },
+                            "docs": "",
+                            "meta": {
+                                "name": "folder_6",
+                                "seq": 6
+                            }
+                        }
+                    },
+                    {
+                        "uid": "9zF3cvhtzbdXiVPw3O5bp",
+                        "pathname": "/Users/lohit/Documents/code/_bruno/bruno_collections/collection_seq/folder_7",
+                        "name": "folder_7",
+                        "seq": 7,
+                        "filename": "folder_7",
+                        "collapsed": true,
+                        "type": "folder",
+                        "items": [],
+                        "depth": 1,
+                        "root": {
+                            "request": {
+                                "headers": [],
+                                "auth": {
+                                    "mode": "inherit"
+                                },
+                                "script": {},
+                                "vars": {},
+                                "tests": ""
+                            },
+                            "docs": "",
+                            "meta": {
+                                "name": "folder_7",
+                                "seq": 7
+                            }
+                        }
+                    },
+                    {
+                        "uid": "fg7zhvdoFQKNoRaD15jtk",
+                        "pathname": "/Users/lohit/Documents/code/_bruno/bruno_collections/collection_seq/folder_7 copyyy",
+                        "name": "folder_7 copyyy",
+                        "seq": 1,
+                        "filename": "folder_7 copyyy",
+                        "collapsed": true,
+                        "type": "folder",
+                        "items": [],
+                        "depth": 1
+                    }
+                ],
+                "runtimeVariables": {},
+                "brunoConfig": {
+                    "version": "1",
+                    "name": "collection_seq",
+                    "type": "collection",
+                    "ignore": [
+                        "node_modules",
+                        ".git"
+                    ],
+                    "size": 0.0001163482666015625,
+                    "filesCount": 2
+                },
+                "securityConfig": {
+                    "jsSandboxMode": "safe"
+                },
+                "settingsSelectedTab": "overview",
+                "folderLevelSettingsSelectedTab": {},
+                "mountStatus": "mounted",
+                "importedAt": 1752330169955,
+                "lastAction": null,
+                "collapsed": false
+            },
+            {
+                "version": "1",
+                "uid": "olcycg000000000000000",
+                "name": "bruno-testbench",
+                "pathname": "/Users/lohit/Documents/code/_bruno/bruno_collections/bruno_testbench",
+                "items": [],
+                "runtimeVariables": {},
+                "brunoConfig": {
+                    "version": "1",
+                    "name": "bruno-testbench",
+                    "type": "collection",
+                    "proxy": {
+                        "enabled": false,
+                        "protocol": "https",
+                        "hostname": "localhost",
+                        "port": 4000,
+                        "auth": {
+                            "enabled": false,
+                            "username": "",
+                            "password": ""
+                        },
+                        "bypassProxy": ""
+                    },
+                    "scripts": {
+                        "moduleWhitelist": [
+                            "crypto",
+                            "buffer",
+                            "form-data"
+                        ],
+                        "filesystemAccess": {
+                            "allow": true
+                        }
+                    },
+                    "clientCertificates": {
+                        "enabled": true,
+                        "certs": []
+                    },
+                    "presets": {
+                        "requestType": "http",
+                        "requestUrl": "http://localhost:6000"
+                    },
+                    "ignore": [
+                        "node_modules",
+                        ".git"
+                    ],
+                    "size": 0.06427669525146484,
+                    "filesCount": 130
+                },
+                "securityConfig": {
+                    "jsSandboxMode": "developer"
+                },
+                "settingsSelectedTab": "overview",
+                "folderLevelSettingsSelectedTab": {},
+                "mountStatus": "unmounted",
+                "importedAt": 1752330169955,
+                "lastAction": null,
+                "collapsed": true
+            },
+            {
+                "version": "1",
+                "uid": "jjkrzp000000000000000",
+                "name": "GCF",
+                "pathname": "/Users/lohit/Downloads/Archive (1)/Reorder",
+                "items": [],
+                "runtimeVariables": {},
+                "brunoConfig": {
+                    "version": "1",
+                    "name": "GCF",
+                    "type": "collection",
+                    "ignore": [
+                        "node_modules",
+                        ".git",
+                        "files",
+                        "logs",
+                        "Services/Global Web API for GCF/environments",
+                        "Services/Global Web API for GCF/collection.bru",
+                        "Services/Reservation Service/environments",
+                        "Services/Reservation Service/collection.bru",
+                        "Services/Resident Service/environments",
+                        "Services/Resident Service/collection.bru",
+                        "Services/User Service/environments",
+                        "Services/User Service/collection.bru",
+                        "Services/Site Service/environments",
+                        "Services/Site Service/collection.bru",
+                        "Services/Document Service/environments",
+                        "Services/Document Service/collection.bru"
+                    ],
+                    "scripts": {
+                        "filesystemAccess": {
+                            "allow": true
+                        }
+                    },
+                    "size": 0.3871917724609375,
+                    "filesCount": 2030
+                },
+                "securityConfig": {
+                    "jsSandboxMode": "safe"
+                },
+                "settingsSelectedTab": "overview",
+                "folderLevelSettingsSelectedTab": {},
+                "mountStatus": "unmounted",
+                "importedAt": 1752330169975,
+                "lastAction": null,
+                "collapsed": true
+            },
+            {
+                "version": "1",
+                "uid": "ptymzt000000000000000",
+                "name": "keycloak-authorization_code",
+                "pathname": "/Users/lohit/Documents/code/bruno-golden-edition-canonical/packages/bruno-tests/keycloak-authorization_code",
+                "items": [],
+                "runtimeVariables": {},
+                "brunoConfig": {
+                    "version": "1",
+                    "name": "keycloak-authorization_code",
+                    "type": "collection",
+                    "ignore": [
+                        "node_modules",
+                        ".git"
+                    ],
+                    "size": 0.001644134521484375,
+                    "filesCount": 5
+                },
+                "securityConfig": {
+                    "jsSandboxMode": "developer"
+                },
+                "settingsSelectedTab": "overview",
+                "folderLevelSettingsSelectedTab": {},
+                "mountStatus": "unmounted",
+                "importedAt": 1752330169975,
+                "lastAction": null,
+                "collapsed": true
+            },
+            {
+                "version": "1",
+                "uid": "13yu4fk00000000000000",
+                "name": "keycloak-client-credentials",
+                "pathname": "/Users/lohit/Documents/code/bruno-golden-edition-canonical/packages/bruno-tests/keycloak-client-credentials",
+                "items": [],
+                "runtimeVariables": {},
+                "brunoConfig": {
+                    "version": "1",
+                    "name": "keycloak-client-credentials",
+                    "type": "collection",
+                    "ignore": [
+                        "node_modules",
+                        ".git"
+                    ],
+                    "size": 0.001361846923828125,
+                    "filesCount": 5
+                },
+                "securityConfig": {
+                    "jsSandboxMode": "developer"
+                },
+                "settingsSelectedTab": "overview",
+                "folderLevelSettingsSelectedTab": {},
+                "mountStatus": "unmounted",
+                "importedAt": 1752330169987,
+                "lastAction": null,
+                "collapsed": true
+            },
+            {
+                "version": "1",
+                "uid": "1gftgsg00000000000000",
+                "name": "keycloak-password-credentials",
+                "pathname": "/Users/lohit/Documents/code/bruno-golden-edition-canonical/packages/bruno-tests/keycloak-password-credentials",
+                "items": [],
+                "runtimeVariables": {},
+                "brunoConfig": {
+                    "version": "1",
+                    "name": "keycloak-password-credentials",
+                    "type": "collection",
+                    "ignore": [
+                        "node_modules",
+                        ".git"
+                    ],
+                    "size": 0.0014104843139648438,
+                    "filesCount": 5
+                },
+                "securityConfig": {
+                    "jsSandboxMode": "safe"
+                },
+                "settingsSelectedTab": "overview",
+                "folderLevelSettingsSelectedTab": {},
+                "mountStatus": "unmounted",
+                "importedAt": 1752330169987,
+                "lastAction": null,
+                "collapsed": true
+            },
+            {
+                "version": "1",
+                "uid": "11beko900000000000000",
+                "name": "collection_runner_tags",
+                "pathname": "/Users/lohit/Documents/code/_bruno/bruno_collections/collection_runner_tags copy",
+                "items": [],
+                "runtimeVariables": {},
+                "brunoConfig": {
+                    "version": "1",
+                    "name": "collection_runner_tags",
+                    "type": "collection",
+                    "ignore": [
+                        "node_modules",
+                        ".git"
+                    ],
+                    "size": 0.00041484832763671875,
+                    "filesCount": 2
+                },
+                "securityConfig": {
+                    "jsSandboxMode": "safe"
+                },
+                "settingsSelectedTab": "overview",
+                "folderLevelSettingsSelectedTab": {},
+                "mountStatus": "unmounted",
+                "importedAt": 1752330169987,
+                "lastAction": null,
+                "collapsed": true
+            }
+        ],
+        "collectionSortOrder": "default"
+    },
+    "tabs": {
+        "tabs": [
+            {
+                "uid": "5etvur000000000000000",
+                "collectionUid": "5etvur000000000000000",
+                "requestPaneWidth": null,
+                "requestPaneTab": "params",
+                "responsePaneTab": "response",
+                "type": "collection-settings",
+                "folderUid": "5etvur000000000000000",
+                "preview": true
+            }
+        ],
+        "activeTabUid": "5etvur000000000000000"
+    },
+    "notifications": {
+        "notifications": [],
+        "readNotificationIds": []
+    },
+    "globalEnvironments": {
+        "globalEnvironments": [],
+        "activeGlobalEnvironmentUid": null
+    }
+}

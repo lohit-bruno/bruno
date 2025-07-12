@@ -108,7 +108,7 @@ app.on('ready', async () => {
     mainWindow.show();
   });
   const url = isDev
-    ? 'http://localhost:3000'
+    ? 'http://localhost:3001'
     : format({
         pathname: path.join(__dirname, '../web/index.html'),
         protocol: 'file:',

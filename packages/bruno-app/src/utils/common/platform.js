@@ -7,6 +7,11 @@ export const isElectron = () => {
     return false;
   }
 
+  window.ipcRenderer = {
+    on: () => {},
+    invoke: () => {}
+  };
+
   return window.ipcRenderer ? true : false;
 };
 
