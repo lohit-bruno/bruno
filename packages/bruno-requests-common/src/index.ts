@@ -54,7 +54,6 @@ export {
 
 export {
   configureRequest,
-  validateRequest
 } from './network/request-configuration';
 
 export {
