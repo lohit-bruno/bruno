@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const chokidar = require('chokidar');
 const { hasBruExtension, isWSLPath, normalizeAndResolvePath, sizeInMB } = require('../utils/filesystem');
-const { bruToEnvJson, bruToJson, bruToJsonViaWorker, collectionBruToJson } = require('../bru');
+const { bruToEnvJson, bruToJson, bruToJsonViaWorker, collectionBruToJson, bruToJsonParsimmon } = require('../bru');
 const { dotenvToJson } = require('@usebruno/lang');
 
 const { uuid } = require('../utils/common');
@@ -16,6 +16,8 @@ const UiStateSnapshot = require('../store/ui-state-snapshot');
 const { parseBruFileMeta, hydrateRequestWithUuid } = require('../utils/collection');
 
 const MAX_FILE_SIZE = 2.5 * 1024 * 1024;
+
+// const MAX_SAFE_FILE_SIZE = 0.1 * 1024 * 1024;
 
 const environmentSecretsStore = new EnvironmentSecretsStore();
 
@@ -256,19 +258,19 @@ const add = async (win, pathname, collectionUid, collectionPath, useWorkerThread
     const fileStats = fs.statSync(pathname);
     let bruContent = fs.readFileSync(pathname, 'utf8');
     // If worker thread is not used, we can directly parse the file
-    if (!useWorkerThread) {
-      try {
-        file.data = await bruToJson(bruContent);
-        file.partial = false;
-        file.loading = false;
-        file.size = sizeInMB(fileStats?.size);
-        hydrateRequestWithUuid(file.data, pathname);
-        win.webContents.send('main:collection-tree-updated', 'addFile', file);
-      } catch (error) {
-        console.error(error);
-      }
-      return;
-    }
+    // if (!useWorkerThread) {
+    //   try {
+    //     file.data = await bruToJson(bruContent);
+    //     file.partial = false;
+    //     file.loading = false;
+    //     file.size = sizeInMB(fileStats?.size);
+    //     hydrateRequestWithUuid(file.data, pathname);
+    //     win.webContents.send('main:collection-tree-updated', 'addFile', file);
+    //   } catch (error) {
+    //     console.error(error);
+    //   }
+    //   return;
+    // }
 
     try {
       // we need to send a partial file info to the UI
@@ -278,30 +280,38 @@ const add = async (win, pathname, collectionUid, collectionPath, useWorkerThread
         type: 'http-request'
       };
 
+      // parse the bru meta details to show in the collection tree
       const metaJson = await bruToJson(parseBruFileMeta(bruContent), true);
       file.data = metaJson;
       file.partial = true;
+      file.verified = false;
       file.loading = false;
       file.size = sizeInMB(fileStats?.size);
       hydrateRequestWithUuid(file.data, pathname);
       win.webContents.send('main:collection-tree-updated', 'addFile', file);
 
-      if (fileStats.size < MAX_FILE_SIZE) {
-        // This is to update the loading indicator in the UI
-        file.data = metaJson;
-        file.partial = false;
-        file.loading = true;
-        hydrateRequestWithUuid(file.data, pathname);
-        win.webContents.send('main:collection-tree-updated', 'addFile', file);
+      // parse the bru file with the parsimmon parser
+      file.data = bruToJsonParsimmon(bruContent);
+      file.partial = false;
+      file.verified = false;
+      file.loading = false;
+      hydrateRequestWithUuid(file.data, pathname);
+      win.webContents.send('main:collection-tree-updated', 'addFile', file);
 
-        // This is to update the file info in the UI
+
+      if (fileStats.size < MAX_FILE_SIZE) {
+        // parse the bru file with the og parser using worker threads in the background
+        // verify if the parsed data matches with the `parsimmon` parsed data
         file.data = await bruToJsonViaWorker(bruContent);
         file.partial = false;
+        file.verified = true;
         file.loading = false;
+        // file.pathname = pathname;
         hydrateRequestWithUuid(file.data, pathname);
-        win.webContents.send('main:collection-tree-updated', 'addFile', file);
+        win.webContents.send('main:collection-tree-updated', 'verifyFile', file);
       }
     } catch(error) {
+      console.log(error);
       file.data = {
         name: path.basename(pathname),
         type: 'http-request'
@@ -311,6 +321,7 @@ const add = async (win, pathname, collectionUid, collectionPath, useWorkerThread
       };
       file.partial = true;
       file.loading = false;
+      file.verified = false;
       file.size = sizeInMB(fileStats?.size);
       hydrateRequestWithUuid(file.data, pathname);
       win.webContents.send('main:collection-tree-updated', 'addFile', file);
@@ -505,6 +516,7 @@ const unlinkDir = async (win, pathname, collectionUid, collectionPath) => {
 };
 
 const onWatcherSetupComplete = (win, watchPath) => {
+  console.log("watcher setup complete");
   const UiStateSnapshotStore = new UiStateSnapshot();
   const collectionsSnapshotState = UiStateSnapshotStore.getCollections();
   const collectionSnapshotState = collectionsSnapshotState?.find(c => c?.pathname == watchPath);

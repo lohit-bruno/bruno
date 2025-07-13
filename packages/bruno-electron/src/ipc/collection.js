@@ -1070,11 +1070,14 @@ const registerRendererEventHandlers = (mainWindow, watcher, lastOpenedCollection
         file.data = metaJson;
         file.loading = true;
         file.partial = true;
+        file.verified = false;
         file.size = sizeInMB(fileStats?.size);
         hydrateRequestWithUuid(file.data, pathname);
         mainWindow.webContents.send('main:collection-tree-updated', 'addFile', file);
+
         file.data = await bruToJsonViaWorker(bruContent);
         file.partial = false;
+        file.verified = true;
         file.loading = true;
         file.size = sizeInMB(fileStats?.size);
         hydrateRequestWithUuid(file.data, pathname);
@@ -1093,6 +1096,7 @@ const registerRendererEventHandlers = (mainWindow, watcher, lastOpenedCollection
         const metaJson = await bruToJson(parseBruFileMeta(bruContent), true);
         file.data = metaJson;
         file.partial = true;
+        file.verified = false;
         file.loading = false;
         file.size = sizeInMB(fileStats?.size);
         hydrateRequestWithUuid(file.data, pathname);
@@ -1145,11 +1149,13 @@ const registerRendererEventHandlers = (mainWindow, watcher, lastOpenedCollection
         file.data = metaJson;
         file.loading = true;
         file.partial = true;
+        file.verified = false;
         file.size = sizeInMB(fileStats?.size);
         hydrateRequestWithUuid(file.data, pathname);
         mainWindow.webContents.send('main:collection-tree-updated', 'addFile', file);
         file.data = bruToJson(bruContent);
         file.partial = false;
+        file.verified = true;
         file.loading = true;
         file.size = sizeInMB(fileStats?.size);
         hydrateRequestWithUuid(file.data, pathname);
@@ -1168,6 +1174,7 @@ const registerRendererEventHandlers = (mainWindow, watcher, lastOpenedCollection
         const metaJson = await bruToJson(parseBruFileMeta(bruContent), true);
         file.data = metaJson;
         file.partial = true;
+        file.verified = false;
         file.loading = false;
         file.size = sizeInMB(fileStats?.size);
         hydrateRequestWithUuid(file.data, pathname);
@@ -1189,7 +1196,7 @@ const registerRendererEventHandlers = (mainWindow, watcher, lastOpenedCollection
       (filesCount > MAX_COLLECTION_FILES_COUNT) ||
       (maxFileSize > MAX_SINGLE_FILE_SIZE_IN_COLLECTION_IN_MB);
 
-    watcher.addWatcher(mainWindow, collectionPathname, collectionUid, brunoConfig, false, shouldLoadCollectionAsync);
+    watcher.addWatcher(mainWindow, collectionPathname, collectionUid, brunoConfig, false, false);
   });
 
   ipcMain.handle('renderer:show-in-folder', async (event, filePath) => {

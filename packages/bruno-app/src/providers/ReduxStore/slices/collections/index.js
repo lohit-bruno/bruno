@@ -1,5 +1,5 @@
 import { uuid } from 'utils/common';
-import { find, map, forOwn, concat, filter, each, cloneDeep, get, set, findIndex } from 'lodash';
+import { find, map, forOwn, concat, filter, each, cloneDeep, get, set, findIndex, isEqual } from 'lodash';
 import { createSlice } from '@reduxjs/toolkit';
 import {
   addDepth,
@@ -1851,6 +1851,7 @@ export const collectionsSlice = createSlice({
             currentItem.pathname = file.meta.pathname;
             currentItem.draft = null;
             currentItem.partial = file.partial;
+            currentItem.verified = file.verified;
             currentItem.loading = file.loading;
             currentItem.size = file.size;
             currentItem.error = file.error;
@@ -1865,6 +1866,7 @@ export const collectionsSlice = createSlice({
               pathname: file.meta.pathname,
               draft: null,
               partial: file.partial,
+              verified: file.verified,
               loading: file.loading,
               size: file.size,
               error: file.error
@@ -1872,6 +1874,20 @@ export const collectionsSlice = createSlice({
           }
         }
         addDepth(collection.items);
+      }
+    },
+    collectionVerifyFileEvent: (state, action) => {
+      const file = action.payload.file;
+      const pathname = file.meta.pathname;
+      const collection = findCollectionByUid(state.collections, file.meta.collectionUid);
+      const item = findItemInCollectionByPathname(collection, pathname);
+      if (item) {
+        // Verify that key properties match between item and file.data
+        const isVerified = 
+          item.name === file.data.name &&
+          item.type === file.data.type &&
+          JSON.stringify(item.request).length === JSON.stringify(file.data.request).length; // ? `_.isEqual` returns false here for some reason
+        item.verified = isVerified;
       }
     },
     collectionAddDirectoryEvent: (state, action) => {
@@ -2426,6 +2442,7 @@ export const {
   collectionUnlinkDirectoryEvent,
   collectionAddEnvFileEvent,
   collectionRenamedEvent,
+  collectionVerifyFileEvent,
   resetRunResults,
   initRunRequestEvent,
   runRequestEvent,

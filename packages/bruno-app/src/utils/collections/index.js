@@ -146,14 +146,19 @@ export const areItemsLoading = (folder) => {
 
 export const getItemsLoadStats = (folder) => {
   let loadingCount = 0;
+  let verifiedCount = 0;
   let flattenedItems = flattenItems(folder.items);
   flattenedItems?.forEach(i => {
-    if(i?.loading) {
+    if (i?.loading) {
       loadingCount += 1;
+    }
+    if (i?.verified) {
+      verifiedCount += 1;
     }
   });
   return {
     loading: loadingCount,
+    verified: verifiedCount,
     total: flattenedItems?.length
   };
 }

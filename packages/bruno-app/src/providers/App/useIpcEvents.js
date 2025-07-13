@@ -24,7 +24,9 @@ import toast from 'react-hot-toast';
 import { useDispatch } from 'react-redux';
 import { isElectron } from 'utils/common/platform';
 import { globalEnvironmentsUpdateEvent, updateGlobalEnvironments } from 'providers/ReduxStore/slices/global-environments';
-import { collectionAddOauth2CredentialsByUrl } from 'providers/ReduxStore/slices/collections/index';
+import { collectionAddOauth2CredentialsByUrl, collectionVerifyFileEvent } from 'providers/ReduxStore/slices/collections/index';
+
+const BATCH_SIZE = 10;
 
 const useIpcEvents = () => {
   const dispatch = useDispatch();
@@ -36,27 +38,61 @@ const useIpcEvents = () => {
 
     const { ipcRenderer } = window;
 
+    // Queue to store dispatch events
+    let dispatchQueue = [];
+
+    // Process queue in batches of 10
+    const processQueue = () => {
+      if (dispatchQueue.length === 0) return;
+      
+      const batch = dispatchQueue.slice(0, BATCH_SIZE);
+      dispatchQueue = dispatchQueue.slice(BATCH_SIZE);
+
+      batch.forEach(action => {
+        dispatch(action);
+      });
+
+      if (dispatchQueue.length > 0) {
+        setTimeout(processQueue, 0);
+      }
+    };
+
+    // Helper to add actions to queue
+    const queueDispatch = (action) => {
+      dispatchQueue.push(action);
+      if (dispatchQueue.length === 1) {
+        setTimeout(processQueue, 0);
+      }
+    };
+
     const _collectionTreeUpdated = (type, val) => {
       if (window.__IS_DEV__) {
         console.log(type);
         console.log(val);
       }
       if (type === 'addDir') {
-        dispatch(
+        queueDispatch(
           collectionAddDirectoryEvent({
             dir: val
           })
         );
       }
       if (type === 'addFile') {
-        dispatch(
+        queueDispatch(
           collectionAddFileEvent({
             file: val
           })
         );
       }
+      if (type === 'verifyFile') {
+        queueDispatch(
+          collectionVerifyFileEvent({
+            file: val
+          })
+        );
+      }
       if (type === 'change') {
-        dispatch(
+        queueDispatch(
           collectionChangeFileEvent({
             file: val
           })
@@ -64,7 +100,7 @@ const useIpcEvents = () => {
       }
       if (type === 'unlink') {
         setTimeout(() => {
-          dispatch(
+          queueDispatch(
             collectionUnlinkFileEvent({
               file: val
             })
@@ -72,17 +108,17 @@ const useIpcEvents = () => {
         }, 100);
       }
       if (type === 'unlinkDir') {
-        dispatch(
+        queueDispatch(
           collectionUnlinkDirectoryEvent({
             directory: val
           })
         );
       }
       if (type === 'addEnvironmentFile') {
-        dispatch(collectionAddEnvFileEvent(val));
+        queueDispatch(collectionAddEnvFileEvent(val));
       }
       if (type === 'unlinkEnvironmentFile') {
-        dispatch(collectionUnlinkEnvFileEvent(val));
+        queueDispatch(collectionUnlinkEnvFileEvent(val));
       }
     };
 
@@ -91,7 +127,7 @@ const useIpcEvents = () => {
     const removeCollectionTreeUpdateListener = ipcRenderer.on('main:collection-tree-updated', _collectionTreeUpdated);
 
     const removeOpenCollectionListener = ipcRenderer.on('main:collection-opened', (pathname, uid, brunoConfig) => {
-      dispatch(openCollectionEvent(uid, pathname, brunoConfig));
+      queueDispatch(openCollectionEvent(uid, pathname, brunoConfig));
     });
 
     const removeCollectionAlreadyOpenedListener = ipcRenderer.on('main:collection-already-opened', (pathname) => {
@@ -108,27 +144,27 @@ const useIpcEvents = () => {
     });
 
     const removeScriptEnvUpdateListener = ipcRenderer.on('main:script-environment-update', (val) => {
-      dispatch(scriptEnvironmentUpdateEvent(val));
+      queueDispatch(scriptEnvironmentUpdateEvent(val));
     });
 
     const removeGlobalEnvironmentVariablesUpdateListener = ipcRenderer.on('main:global-environment-variables-update', (val) => {
-      dispatch(globalEnvironmentsUpdateEvent(val));
+      queueDispatch(globalEnvironmentsUpdateEvent(val));
     });
 
     const removeCollectionRenamedListener = ipcRenderer.on('main:collection-renamed', (val) => {
-      dispatch(collectionRenamedEvent(val));
+      queueDispatch(collectionRenamedEvent(val));
     });
 
     const removeRunFolderEventListener = ipcRenderer.on('main:run-folder-event', (val) => {
-      dispatch(runFolderEvent(val));
+      queueDispatch(runFolderEvent(val));
     });
 
     const removeRunRequestEventListener = ipcRenderer.on('main:run-request-event', (val) => {
-      dispatch(runRequestEvent(val));
+      queueDispatch(runRequestEvent(val));
     });
 
     const removeProcessEnvUpdatesListener = ipcRenderer.on('main:process-env-update', (val) => {
-      dispatch(processEnvUpdateEvent(val));
+      queueDispatch(processEnvUpdateEvent(val));
     });
 
     const removeConsoleLogListener = ipcRenderer.on('main:console-log', (val) => {
@@ -136,31 +172,31 @@ const useIpcEvents = () => {
     });
 
     const removeConfigUpdatesListener = ipcRenderer.on('main:bruno-config-update', (val) =>
-      dispatch(brunoConfigUpdateEvent(val))
+      queueDispatch(brunoConfigUpdateEvent(val))
     );
 
     const removeShowPreferencesListener = ipcRenderer.on('main:open-preferences', () => {
-      dispatch(showPreferences(true));
+      queueDispatch(showPreferences(true));
     });
 
     const removePreferencesUpdatesListener = ipcRenderer.on('main:load-preferences', (val) => {
-      dispatch(updatePreferences(val));
+      queueDispatch(updatePreferences(val));
     });
 
     const removeSystemProxyEnvUpdatesListener = ipcRenderer.on('main:load-system-proxy-env', (val) => {
-      dispatch(updateSystemProxyEnvVariables(val));
+      queueDispatch(updateSystemProxyEnvVariables(val));
     });
 
     const removeCookieUpdateListener = ipcRenderer.on('main:cookies-update', (val) => {
-      dispatch(updateCookies(val));
+      queueDispatch(updateCookies(val));
     });
 
     const removeGlobalEnvironmentsUpdatesListener = ipcRenderer.on('main:load-global-environments', (val) => {
-      dispatch(updateGlobalEnvironments(val));
+      queueDispatch(updateGlobalEnvironments(val));
     });
 
     const removeSnapshotHydrationListener = ipcRenderer.on('main:hydrate-app-with-ui-state-snapshot', (val) => {
-      dispatch(hydrateCollectionWithUiStateSnapshot(val));
+      queueDispatch(hydrateCollectionWithUiStateSnapshot(val));
     });
 
     const removeCollectionOauth2CredentialsUpdatesListener = ipcRenderer.on('main:credentials-update', (val) => {
@@ -170,7 +206,7 @@ const useIpcEvents = () => {
         folderUid: val.folderUid || null,
         credentialsId: val.credentialsId || 'credentials'
       };
-      dispatch(collectionAddOauth2CredentialsByUrl(payload));
+      queueDispatch(collectionAddOauth2CredentialsByUrl(payload));
     });
 
     return () => {

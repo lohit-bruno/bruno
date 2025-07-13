@@ -9,7 +9,7 @@ const Info = ({ collection }) => {
   const totalRequestsInCollection = getTotalRequestCountInCollection(collection);
 
   const isCollectionLoading = areItemsLoading(collection);
-  const { loading: itemsLoadingCount, total: totalItems } = getItemsLoadStats(collection);
+  const { loading: itemsLoadingCount, total: totalItems, verified: itemsVerifiedCount } = getItemsLoadStats(collection);
   const [showShareCollectionModal, toggleShowShareCollectionModal] = useState(false);
   
   const handleToggleShowShareCollectionModal = (value) => (e) => {
@@ -53,9 +53,28 @@ const Info = ({ collection }) => {
             </div>
             <div className="ml-4">
               <div className="font-semibold text-sm">Requests</div>
-              <div className="mt-1 text-sm text-muted">
+              <div className="mt-1 text-sm text-muted tabular-nums">
                 {
                   isCollectionLoading? `${totalItems - itemsLoadingCount} out of ${totalItems} requests in the collection loaded` : `${totalRequestsInCollection} request${totalRequestsInCollection !== 1 ? 's' : ''} in collection`
+                }
+              </div>
+            </div>
+          </div>
+
+
+          {/* Verification Row */}
+          <div className="flex items-start">
+            <div className="flex-shrink-0 p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+              <IconApi className="w-5 h-5 text-purple-500" stroke={1.5} />
+            </div>
+            <div className="ml-4 flex flex-col gap-y-1 w-full">
+              <div className="font-semibold text-sm">Verification</div>
+              <div className="bg-gray-500/50 h-[2px] w-full">
+                <div className="h-[2px] bg-green-500" style={{width: itemsVerifiedCount > 0 ? `${(itemsVerifiedCount * 100 / totalRequestsInCollection)}%` : '0%'}}></div>
+              </div>
+              <div className="mt-1 text-sm text-muted tabular-nums">
+                {
+                  itemsVerifiedCount ? `${itemsVerifiedCount} out of ${totalRequestsInCollection} requests in the collection are verified` : `verification in progress...`
                 }
               </div>
             </div>

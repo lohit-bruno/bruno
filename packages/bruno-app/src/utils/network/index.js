@@ -33,6 +33,10 @@ const sendHttpRequest = async (item, collection, environment, runtimeVariables) 
 
     ipcRenderer
       .invoke('send-http-request', item, collection, environment, runtimeVariables)
+      .then(response => {
+        console.debug(JSON.stringify(response, null, 2));
+        return response;
+      })
       .then(resolve)
       .catch(reject);
   });

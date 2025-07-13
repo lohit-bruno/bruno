@@ -5,7 +5,8 @@ const {
   bruToEnvJsonV2,
   envJsonToBruV2,
   collectionBruToJson: _collectionBruToJson,
-  jsonToCollectionBru: _jsonToCollectionBru
+  jsonToCollectionBru: _jsonToCollectionBru,
+  bruToJsonParsimmon: _bruToJsonParsimmon
 } = require('@usebruno/lang');
 const BruParserWorker = require('./workers');
 
@@ -154,6 +155,57 @@ const bruToJson = (data, parsed = false) => {
   }
 };
 
+/**
+ * The transformer function for converting a BRU file to JSON.
+ *
+ * We map the json response from the bru lang and transform it into the DSL
+ * format that the app uses
+ *
+ * @param {string} data The BRU file content.
+ * @returns {object} The JSON representation of the BRU file.
+ */
+const bruToJsonParsimmon = (data, parsed = false) => {
+  try {
+    const json = parsed ? data : _bruToJsonParsimmon(data);
+
+    let requestType = _.get(json, 'meta.type');
+    if (requestType === 'http') {
+      requestType = 'http-request';
+    } else if (requestType === 'graphql') {
+      requestType = 'graphql-request';
+    } else {
+      requestType = 'http-request';
+    }
+
+    const sequence = _.get(json, 'meta.seq');
+    const transformedJson = {
+      type: requestType,
+      name: _.get(json, 'meta.name'),
+      seq: !isNaN(sequence) ? Number(sequence) : 1,
+      request: {
+        method: _.upperCase(_.get(json, 'http.method')),
+        url: _.get(json, 'http.url'),
+        params: _.get(json, 'params', []),
+        headers: _.get(json, 'headers', []),
+        auth: _.get(json, 'auth', {}),
+        body: _.get(json, 'body', {}),
+        script: _.get(json, 'script', {}),
+        vars: _.get(json, 'vars', {}),
+        assertions: _.get(json, 'assertions', []),
+        tests: _.get(json, 'tests', ''),
+        docs: _.get(json, 'docs', '')
+      }
+    };
+
+    transformedJson.request.auth.mode = _.get(json, 'http.auth', 'none');
+    transformedJson.request.body.mode = _.get(json, 'http.body', 'none');
+
+    return transformedJson;
+  } catch (e) {
+    return Promise.reject(e);
+  }
+};
+
 const bruToJsonViaWorker = async (data) => {
   try {
     const json = await bruParserWorker?.bruToJson(data);
@@ -263,5 +315,6 @@ module.exports = {
   envJsonToBru,
   collectionBruToJson,
   jsonToCollectionBru,
-  jsonToBruViaWorker
+  jsonToBruViaWorker,
+  bruToJsonParsimmon
 };
