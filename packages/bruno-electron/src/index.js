@@ -2,6 +2,9 @@ const fs = require('fs');
 const path = require('path');
 const isDev = require('electron-is-dev');
 
+const { ScriptRuntime } = require('@usebruno/js-common');
+console.log(typeof ScriptRuntime);
+
 if (isDev) {
   if(!fs.existsSync(path.join(__dirname, '../../bruno-js/src/sandbox/bundle-browser-rollup.js'))) {
     console.log('JS Sandbox libraries have not been bundled yet');
@@ -108,7 +111,7 @@ app.on('ready', async () => {
     mainWindow.show();
   });
   const url = isDev
-    ? 'http://localhost:3000'
+    ? 'http://localhost:3001'
     : format({
         pathname: path.join(__dirname, '../web/index.html'),
         protocol: 'file:',

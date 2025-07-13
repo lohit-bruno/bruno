@@ -14,7 +14,9 @@
     "packages/bruno-tests",
     "packages/bruno-toml",
     "packages/bruno-graphql-docs",
-    "packages/bruno-requests"
+    "packages/bruno-requests",
+    "packages/bruno-js-common",
+    "packages/bruno-requests-common"
   ],
   "homepage": "https://usebruno.com",
   "devDependencies": {
@@ -47,6 +49,8 @@
     "dev:electron": "npm run dev --workspace=packages/bruno-electron",
     "dev:electron:debug": "npm run debug --workspace=packages/bruno-electron",
     "build:bruno-common": "npm run build --workspace=packages/bruno-common",
+    "build:bruno-js-common": "npm run build --workspace=packages/bruno-js-common",
+    "build:bruno-requests-common": "npm run build --workspace=packages/bruno-requests-common",
     "build:bruno-requests": "npm run build --workspace=packages/bruno-requests",
     "build:bruno-converters": "npm run build --workspace=packages/bruno-converters",
     "build:bruno-query": "npm run build --workspace=packages/bruno-query",
@@ -59,6 +63,8 @@
     "build:electron:rpm": "./scripts/build-electron.sh rpm",
     "build:electron:snap": "./scripts/build-electron.sh snap",
     "watch:common": "npm run watch --workspace=packages/bruno-common",
+    "watch:js-common": "npm run watch --workspace=packages/bruno-js-common",
+    "watch:requests-common": "npm run watch --workspace=packages/bruno-requests-common",
     "test:codegen": "node playwright/codegen.ts",
     "test:e2e": "playwright test",
     "test:prettier:web": "npm run test:prettier --workspace=packages/bruno-app",
