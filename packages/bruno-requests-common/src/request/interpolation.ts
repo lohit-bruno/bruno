@@ -1,5 +1,5 @@
-import { default as interpolate } from '../interpolate';
-import { BrunoRequest, BrunoInterpolationOptions } from './types';
+const { interpolate } = require('@usebruno/common');
+import { BrunoRequest, BrunoInterpolationOptions, BrunoVariables } from './types';
 
 /**
  * Get the content type from headers in a case-insensitive manner
@@ -26,7 +26,7 @@ export const interpolateString = (
     return str;
   }
 
-  return interpolate(str, variables, options);
+  return interpolate(str, variables, { escapeJSONStrings: options.escapeJSONStrings || false });
 };
 
 /**
@@ -177,13 +177,7 @@ export const interpolateRequest = (
 
   // Combine all variables with proper precedence
   const combinedVariables = {
-    ...variables.globalEnvironmentVariables,
-    ...variables.collectionVariables,
-    ...variables.envVariables,
-    ...variables.folderVariables,
-    ...variables.requestVariables,
-    ...variables.oauth2CredentialVariables,
-    ...variables.runtimeVariables,
+    ...variables,
     ...(options.processEnvVars && {
       process: {
         env: options.processEnvVars
@@ -223,16 +217,7 @@ export const interpolateRequest = (
  * Create combined variables object with proper precedence
  */
 export const createCombinedVariables = (
-  variables: {
-    globalEnvironmentVariables?: Record<string, any>;
-    collectionVariables?: Record<string, any>;
-    envVariables?: Record<string, any>;
-    folderVariables?: Record<string, any>;
-    requestVariables?: Record<string, any>;
-    oauth2CredentialVariables?: Record<string, any>;
-    runtimeVariables?: Record<string, any>;
-    processEnvVariables?: Record<string, any>;
-  }
+  variables: BrunoVariables
 ): Record<string, any> => {
   return {
     ...variables.globalEnvironmentVariables,

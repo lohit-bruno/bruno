@@ -3,16 +3,20 @@ import {
   BrunoCollection, 
   BrunoItem, 
   BrunoRequestContext,
-  BrunoParam
+  BrunoParam,
+  BrunoVariables
 } from './types';
 
 /**
  * Get the tree path from collection to the specific item
  */
-export const getTreePathFromCollectionToItem = (
-  collection: BrunoCollection,
-  item: BrunoItem
-): BrunoItem[] => {
+export const getTreePathFromCollectionToItem = ({
+  collection,
+  item
+}: {
+  collection: BrunoCollection;
+  item: BrunoItem;
+}): BrunoItem[] => {
   const path: BrunoItem[] = [];
   
   const findItemPath = (items: BrunoItem[], targetItem: BrunoItem, currentPath: BrunoItem[]): boolean => {
@@ -43,11 +47,15 @@ export const getTreePathFromCollectionToItem = (
 /**
  * Merge variables from collection, folder, and request levels
  */
-export const mergeVariables = (
-  collection: BrunoCollection,
-  request: BrunoRequest,
-  requestTreePath: BrunoItem[]
-): {
+export const mergeVariables = ({
+  collection,
+  request,
+  requestTreePath
+}: {
+  collection: BrunoCollection;
+  request: BrunoRequest;
+  requestTreePath: BrunoItem[];
+}): {
   collectionVariables: Record<string, any>;
   folderVariables: Record<string, any>;
   requestVariables: Record<string, any>;
@@ -94,11 +102,15 @@ export const mergeVariables = (
 /**
  * Merge headers from collection, folder, and request levels
  */
-export const mergeHeaders = (
-  collection: BrunoCollection,
-  request: BrunoRequest,
-  requestTreePath: BrunoItem[]
-): Record<string, string> => {
+export const mergeHeaders = ({
+  collection,
+  request,
+  requestTreePath
+}: {
+  collection: BrunoCollection;
+  request: BrunoRequest;
+  requestTreePath: BrunoItem[];
+}): Record<string, string> => {
   const headers = new Map<string, string>();
   
   // Add collection headers
@@ -145,12 +157,17 @@ export const mergeHeaders = (
 /**
  * Merge scripts from collection, folder, and request levels
  */
-export const mergeScripts = (
-  collection: BrunoCollection,
-  request: BrunoRequest,
-  requestTreePath: BrunoItem[],
-  scriptFlow: string = 'sandwich'
-): {
+export const mergeScripts = ({
+  collection,
+  request,
+  requestTreePath,
+  scriptFlow = 'sandwich'
+}: {
+  collection: BrunoCollection;
+  request: BrunoRequest;
+  requestTreePath: BrunoItem[];
+  scriptFlow?: string;
+}): {
   preRequestScripts: string[];
   postResponseScripts: string[];
   testScripts: string[];
@@ -237,44 +254,56 @@ export const mergeScripts = (
 export const createRunRequestContext = ({
   collection,
   item,
-  request,
   envVariables = {},
   runtimeVariables = {},
   processEnvVariables = {}
 }: {
   collection: BrunoCollection;
   item: BrunoItem;
-  request: BrunoRequest;
   envVariables?: Record<string, any>;
   runtimeVariables?: Record<string, any>;
   processEnvVariables?: Record<string, any>;
 }): BrunoRequestContext => {
   // Get the tree path from collection to the item
-  const requestTreePath = getTreePathFromCollectionToItem(collection, item);
+  const requestTreePath = getTreePathFromCollectionToItem({ collection, item });
+  const request = item.draft ? item.draft.request : item.request;
   
   // Determine script flow
   const scriptFlow = collection.brunoConfig?.scripts?.flow || 'sandwich';
   
   // Merge variables from different levels
-  const { collectionVariables, folderVariables, requestVariables } = mergeVariables(
+  const { collectionVariables, folderVariables, requestVariables } = mergeVariables({
     collection,
     request,
     requestTreePath
-  );
+  });
   
   // Merge headers from different levels
-  const mergedHeaders = mergeHeaders(collection, request, requestTreePath);
+  const mergedHeaders = mergeHeaders({ collection, request, requestTreePath });
   
   // Merge scripts from different levels
-  const { preRequestScripts, postResponseScripts, testScripts } = mergeScripts(
+  const { preRequestScripts, postResponseScripts, testScripts } = mergeScripts({
     collection,
     request,
     requestTreePath,
     scriptFlow
-  );
+  });
+  
+  // Create the variables object
+  const variables: BrunoVariables = {
+    envVariables,
+    runtimeVariables,
+    processEnvVariables,
+    collectionVariables,
+    folderVariables,
+    requestVariables,
+    globalEnvironmentVariables: collection.globalEnvironmentVariables || {},
+    oauth2CredentialVariables: {} // TODO: Implement OAuth2 credentials formatting
+  };
   
   // Create the context object
   const context: BrunoRequestContext = {
+    collectionName: collection.name,
     request: {
       ...request,
       headers: mergedHeaders,
@@ -284,16 +313,7 @@ export const createRunRequestContext = ({
       globalEnvironmentVariables: collection.globalEnvironmentVariables || {},
       oauth2CredentialVariables: {} // TODO: Implement OAuth2 credentials formatting
     },
-    variables: {
-      envVariables,
-      runtimeVariables,
-      processEnvVariables,
-      collectionVariables,
-      folderVariables,
-      requestVariables,
-      globalEnvironmentVariables: collection.globalEnvironmentVariables || {},
-      oauth2CredentialVariables: {} // TODO: Implement OAuth2 credentials formatting
-    },
+    variables,
     scripts: {
       preRequestScripts,
       postResponseScripts,

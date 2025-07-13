@@ -56,11 +56,11 @@ module.exports = [
     cjsOutput: 'dist/runner/cjs/index.js',
     esmOutput: 'dist/runner/esm/index.js'
   }),
-  // Request module
-  ...createBuildConfig({
-    inputDir: 'src/request/**/*',
-    input: 'src/request/index.ts',
-    cjsOutput: 'dist/request/cjs/index.js',
-    esmOutput: 'dist/request/esm/index.js'
-  })
+  // // Request module
+  // ...createBuildConfig({
+  //   inputDir: 'src/request/**/*',
+  //   input: 'src/request/index.ts',
+  //   cjsOutput: 'dist/request/cjs/index.js',
+  //   esmOutput: 'dist/request/esm/index.js'
+  // })
 ];

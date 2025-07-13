@@ -13,8 +13,7 @@ export {
 // Request execution (Part 2)
 export {
   runRequest,
-  executePreRequestScripts,
-  executePostResponseScripts,
+  runScripts,
   executeTestScripts,
   executeAssertions,
   createHttpClient,
@@ -33,3 +32,7 @@ export {
   createCombinedVariables,
   getContentType
 } from './interpolation'; 
+
+export {
+  makeRequest
+} from './make-request';

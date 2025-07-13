@@ -134,7 +134,7 @@ export interface BrunoItem {
   name: string;
   type: string;
   seq: number;
-  request?: BrunoRequest;
+  request: BrunoRequest;
   draft?: {
     request: BrunoRequest;
   };
@@ -143,19 +143,22 @@ export interface BrunoItem {
   requestUid?: string;
 }
 
+export interface BrunoVariables {
+  envVariables: Record<string, any>;
+  runtimeVariables: Record<string, any>;
+  processEnvVariables?: Record<string, any>;
+  collectionVariables: Record<string, any>;
+  folderVariables: Record<string, any>;
+  requestVariables: Record<string, any>;
+  globalEnvironmentVariables: Record<string, any>;
+  oauth2CredentialVariables: Record<string, any>;
+}
+
 // Context Types
 export interface BrunoRequestContext {
+  collectionName: string;
   request: BrunoRequest;
-  variables: {
-    envVariables: Record<string, any>;
-    runtimeVariables: Record<string, any>;
-    processEnvVariables?: Record<string, any>;
-    collectionVariables: Record<string, any>;
-    folderVariables: Record<string, any>;
-    requestVariables: Record<string, any>;
-    globalEnvironmentVariables: Record<string, any>;
-    oauth2CredentialVariables: Record<string, any>;
-  };
+  variables: BrunoVariables;
   scripts: {
     preRequestScripts: string[];
     postResponseScripts: string[];
@@ -175,9 +178,6 @@ export interface BrunoResponse {
 }
 
 export interface BrunoRunRequestOptions {
-  envVariables?: Record<string, any>;
-  runtimeVariables?: Record<string, any>;
-  processEnvVariables?: Record<string, any>;
   collectionPath?: string;
   onConsoleLog?: (type: string, args: any[]) => void;
   scriptingConfig?: BrunoBrunoConfig['scripts'];
@@ -207,58 +207,65 @@ export interface BrunoRunRequestResult {
 
 // Runtime Types
 export interface BrunoScriptRuntime {
-  runRequestScript: (
-    script: string,
-    request: BrunoRequest,
-    envVariables: Record<string, any>,
-    runtimeVariables: Record<string, any>,
-    collectionPath: string,
-    onConsoleLog?: (type: string, args: any[]) => void,
-    processEnvVars?: Record<string, any>,
-    scriptingConfig?: BrunoBrunoConfig['scripts'],
-    runRequestByItemPathname?: (pathname: string) => Promise<BrunoResponse>,
-    collectionName?: string
-  ) => Promise<any>;
-  runResponseScript: (
-    script: string,
-    request: BrunoRequest,
-    response: BrunoResponse,
-    envVariables: Record<string, any>,
-    runtimeVariables: Record<string, any>,
-    collectionPath: string,
-    onConsoleLog?: (type: string, args: any[]) => void,
-    processEnvVars?: Record<string, any>,
-    scriptingConfig?: BrunoBrunoConfig['scripts'],
-    runRequestByItemPathname?: (pathname: string) => Promise<BrunoResponse>,
-    collectionName?: string
-  ) => Promise<any>;
+  runScript: ({
+    script,
+    request,
+    response,
+    variables,
+    assertionResults,
+    collectionName,
+    collectionPath,
+    onConsoleLog,
+    runRequestByItemPathname
+  }: {
+    script: string;
+    request: BrunoRequest;
+    response?: BrunoResponse;
+    variables: BrunoVariables;
+    assertionResults?: any[];
+    collectionName: string;
+    collectionPath: string;
+    onConsoleLog?: (type: string, args: any[]) => void;
+    runRequestByItemPathname?: (pathname: string) => Promise<BrunoResponse>;
+  }) => Promise<any>;
 }
 
 export interface BrunoTestRuntime {
-  runTests: (
-    testsFile: string,
-    request: BrunoRequest,
-    response: BrunoResponse,
-    envVariables: Record<string, any>,
-    runtimeVariables: Record<string, any>,
-    collectionPath: string,
-    onConsoleLog?: (type: string, args: any[]) => void,
-    processEnvVars?: Record<string, any>,
-    scriptingConfig?: BrunoBrunoConfig['scripts'],
-    runRequestByItemPathname?: (pathname: string) => Promise<BrunoResponse>,
-    collectionName?: string
-  ) => Promise<any>;
+  runTests: ({
+    testsFile,
+    request,
+    response,
+    variables,
+    collectionPath,
+    onConsoleLog,
+    scriptingConfig,
+    runRequestByItemPathname,
+    collectionName
+  }: {
+    testsFile: string;
+    request: BrunoRequest;
+    response: BrunoResponse;
+    variables: BrunoVariables;
+    collectionPath: string;
+    onConsoleLog?: (type: string, args: any[]) => void;
+    scriptingConfig?: BrunoBrunoConfig['scripts'];
+    runRequestByItemPathname?: (pathname: string) => Promise<BrunoResponse>;
+    collectionName?: string;
+  }) => Promise<any>;
 }
 
 export interface BrunoAssertRuntime {
-  runAssertions: (
-    assertions: BrunoAssertion[],
-    request: BrunoRequest,
-    response: BrunoResponse,
-    envVariables: Record<string, any>,
-    runtimeVariables: Record<string, any>,
-    processEnvVars?: Record<string, any>
-  ) => any[];
+  runAssertions: ({
+    assertions,
+    request,
+    response,
+    variables
+  }: {
+    assertions: BrunoAssertion[];
+    request: BrunoRequest;
+    response: BrunoResponse;
+    variables: BrunoVariables;
+  }) => any[];
 }
 
 // Utility Types

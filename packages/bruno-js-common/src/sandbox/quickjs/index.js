@@ -89,6 +89,7 @@ const executeQuickJsVm = ({ script: externalScript, context: externalContext, sc
 };
 
 const executeQuickJsVmAsync = async ({ script: externalScript, context: externalContext, collectionPath }) => {
+  console.log("hererererer     ");
   if (!externalScript?.length || typeof externalScript !== 'string') {
     return externalScript;
   }

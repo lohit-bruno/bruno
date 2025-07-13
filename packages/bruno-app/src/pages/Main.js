@@ -8,6 +8,8 @@ import ReduxStore from 'providers/ReduxStore';
 import ThemeProvider from 'providers/Theme/index';
 import ErrorBoundary from './ErrorBoundary';
 
+import { request } from '@usebruno/requests-common';
+
 import { ScriptRuntime } from '@usebruno/js-common';
 const scriptRuntime = new ScriptRuntime();
 
@@ -37,12 +39,21 @@ import '@fontsource/inter/700.css';
 import '@fontsource/inter/800.css';
 import '@fontsource/inter/900.css';
 import { setupPolyfills } from 'utils/common/setupPolyfills';
+import { getEnvVars } from 'utils/collections/index';
 setupPolyfills();
 
 window.ipcRenderer = {
   invoke: async (channel, ...args) => { 
+    console.log(channel, args, typeof request.makeRequest);
     if (channel === 'send-http-request') {
-      console.log(args);
+      const [ item, collection, environment, ...rest ] = args;
+      const envVariables = getEnvVars(environment);
+      const _res = await request.makeRequest({
+        item,
+        collection,
+        envVariables 
+      });
+      console.log(_res);
       return res;
     }
     return {} 

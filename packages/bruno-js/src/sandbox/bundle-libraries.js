@@ -6,30 +6,8 @@ const { terser } = require('rollup-plugin-terser');
 
 const bundleLibraries = async () => {
   const codeScript = `
-    import { expect, assert } from 'chai';
-    import { Buffer } from "buffer";
-    import moment from "moment";
-    import btoa from "btoa";
-    import atob from "atob";
-    import * as CryptoJS from "@usebruno/crypto-js";
-    import tv4 from "tv4";
-    globalThis.expect = expect;
-    globalThis.assert = assert;
-    globalThis.moment = moment;
-    globalThis.btoa = btoa;
-    globalThis.atob = atob;
-    globalThis.Buffer = Buffer;
-    globalThis.CryptoJS = CryptoJS;
-    globalThis.tv4 = tv4;
     globalThis.requireObject = {
-      ...(globalThis.requireObject || {}),
-      'chai': { expect, assert },
-      'moment': moment,
-      'buffer': { Buffer },
-      'btoa': btoa,
-      'atob': atob,
-      'crypto-js': CryptoJS,
-      'tv4': tv4
+      ...(globalThis.requireObject || {})
     };
 `;
 

@@ -31,6 +31,8 @@ const sendHttpRequest = async (item, collection, environment, runtimeVariables) 
   return new Promise((resolve, reject) => {
     const { ipcRenderer } = window;
 
+    console.log("send http", item, collection, environment, runtimeVariables);
+
     ipcRenderer
       .invoke('send-http-request', item, collection, environment, runtimeVariables)
       .then(resolve)

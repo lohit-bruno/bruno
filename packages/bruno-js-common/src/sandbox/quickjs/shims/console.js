@@ -1,6 +1,8 @@
 const addConsoleShimToContext = (vm, console) => {
   if (!console) return;
 
+  console.log("adding console shim");
+
   const consoleHandle = vm.newObject();
 
   const logHandle = vm.newFunction('log', (...args) => {

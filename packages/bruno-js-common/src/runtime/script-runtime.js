@@ -72,20 +72,21 @@ class ScriptRuntime {
       context.res = res;
     }
 
-    if (onConsoleLog && typeof onConsoleLog === 'function') {
-      const customLogger = (type) => {
-        return (...args) => {
-          onConsoleLog(type, cleanJson(args));
-        };
-      };
-      context.console = {
-        log: customLogger('log'),
-        debug: customLogger('debug'),
-        info: customLogger('info'),
-        warn: customLogger('warn'),
-        error: customLogger('error')
-      };
-    }
+    // if (onConsoleLog && typeof onConsoleLog === 'function') { // ?
+      // const customLogger = (type) => {
+      //   return (...args) => {
+      //     console(type, cleanJson(args));
+      //   };
+      // };
+      // context.console = {
+      //   log: customLogger('log'),
+      //   debug: customLogger('debug'),
+      //   info: customLogger('info'),
+      //   warn: customLogger('warn'),
+      //   error: customLogger('error')
+      // };
+    // }
+    context.console = console;
 
     if (runRequestByItemPathname) {
       context.bru.runRequest = runRequestByItemPathname;
