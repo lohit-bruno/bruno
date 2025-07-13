@@ -1,0 +1,4 @@
+src/sandbox/bundle-browser-rollup.js
+dist/
+*.d.ts
+node_modules/
