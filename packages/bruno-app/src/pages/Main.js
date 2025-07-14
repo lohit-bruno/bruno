@@ -53,7 +53,7 @@ window.ipcRenderer = {
         collection,
         envVariables 
       });
-      console.log(_res);
+      console.log({_res});
       return res;
     }
     return {} 
