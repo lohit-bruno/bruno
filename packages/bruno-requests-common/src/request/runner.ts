@@ -290,9 +290,13 @@ export const runRequest = async ({
       combinedVariables,
       { processEnvVars: currentVariables.processEnvVariables }
     );
+
+    console.log("make request", interpolatedRequest, options);
     
     // Step 3: Execute HTTP request
     response = await httpClient.makeRequest({ request: interpolatedRequest, options });
+
+    console.log("make request done", response);
     
     // Step 4: Execute post-response scripts
     const postResponseResult = await runScripts({
