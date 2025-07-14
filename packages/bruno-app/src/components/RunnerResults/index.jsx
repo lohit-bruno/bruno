@@ -203,7 +203,7 @@ export default function RunnerResults({ collection }) {
                 <div className="text-green-500">
                   {tags.include.join(', ')}
                 </div>
-                <div className="text-red-500">
+                <div className="text-gray-500">
                   {tags.exclude.join(', ')}
                 </div>
               </div>

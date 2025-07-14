@@ -22,7 +22,7 @@ import StatusDot from 'components/StatusDot';
 const ContentIndicator = () => {
   return (
     <sup className="ml-[.125rem] opacity-80 font-medium">
-      <DotIcon width="10"></DotIcon>
+      <StatusDot width="10"></StatusDot>
     </sup>
   );
 };
@@ -109,7 +109,7 @@ const HttpRequestPane = ({ item, collection }) => {
   const requestVars = getPropertyFromDraftOrRequest('request.vars.req');
   const responseVars = getPropertyFromDraftOrRequest('request.vars.res');
   const auth = getPropertyFromDraftOrRequest('request.auth');
-  const tags = getPropertyFromDraftOrRequest('request.tags');
+  const tags = getPropertyFromDraftOrRequest('tags');
 
   const activeParamsLength = params.filter((param) => param.enabled).length;
   const activeHeadersLength = headers.filter((header) => header.enabled).length;

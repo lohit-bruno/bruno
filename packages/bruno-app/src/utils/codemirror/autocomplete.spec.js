@@ -548,6 +548,8 @@ describe('Bruno Autocomplete', () => {
       });
 
       it('should show hints on click when showHintsOnClick is enabled', () => {
+        jest.useFakeTimers();
+        
         const mockGetAnywordAutocompleteHints = jest.fn(() => ['Content-Type', 'Accept']);
         const options = { 
           getAllVariables: mockGetAllVariables,
@@ -564,9 +566,14 @@ describe('Bruno Autocomplete', () => {
 
         clickHandler(mockedCodemirror);
 
+        // Run all timers to execute the setTimeout
+        jest.runAllTimers();
+
         expect(mockGetAllVariables).toHaveBeenCalled();
         expect(mockGetAnywordAutocompleteHints).toHaveBeenCalled();
         expect(mockedCodemirror.showHint).toHaveBeenCalled();
+        
+        jest.useRealTimers();
       });
 
       it('should not show hints on click when showHintsOnClick is disabled', () => {
@@ -609,6 +616,8 @@ describe('Bruno Autocomplete', () => {
       });
 
       it('should show all available hints on click based on showHintsFor configuration', () => {
+        jest.useFakeTimers();
+        
         const mockGetAnywordAutocompleteHints = jest.fn(() => ['Content-Type', 'Accept']);
         const options = { 
           getAllVariables: mockGetAllVariables.mockReturnValue({
@@ -629,6 +638,9 @@ describe('Bruno Autocomplete', () => {
 
         clickHandler(mockedCodemirror);
 
+        // Run all timers to execute the setTimeout
+        jest.runAllTimers();
+
         expect(mockedCodemirror.showHint).toHaveBeenCalledWith({
           hint: expect.any(Function),
           completeSingle: false
@@ -644,6 +656,8 @@ describe('Bruno Autocomplete', () => {
           to: mockCursor
         });
         expect(hintResult.list.length).toBeGreaterThan(0);
+        
+        jest.useRealTimers();
       });
 
       it('should not show hints on click when no hints are available', () => {

@@ -4,7 +4,7 @@ import StyledWrapper from './StyledWrapper';
 import SingleLineEditor from 'components/SingleLineEditor/index';
 import { useTheme } from 'providers/Theme/index';
 
-const TagList = ({ tagsHintList = [], handleAddTag, tags, handleRemoveTag, onSave }) => {
+const TagList = ({ tagsHintList = [], handleAddTag, tags, handleRemoveTag, onSave, handleValidation }) => {
   const { displayedTheme } = useTheme();
   const tagNameRegex = /^[\w-]+$/;
   const [text, setText] = useState('');
@@ -24,6 +24,14 @@ const TagList = ({ tagsHintList = [], handleAddTag, tags, handleRemoveTag, onSav
       setError(`Tag "${text}" already exists`);
       return;
     }
+    if (handleValidation) {
+      const error = handleValidation(text);
+      if (error) {
+        setError(error);
+        setText('');
+        return;
+      }
+    }
     handleAddTag(text);
     setText('');
   };
@@ -31,6 +39,7 @@ const TagList = ({ tagsHintList = [], handleAddTag, tags, handleRemoveTag, onSav
   return (
     <StyledWrapper className="flex flex-wrap flex-col gap-2">
       <SingleLineEditor
+        className="border border-gray-500/50 px-2"
         value={text}
         placeholder="Enter tag name (e.g., api, auth, test)"
         autocomplete={tagsHintList}

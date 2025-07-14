@@ -23,20 +23,38 @@ const RunnerTags = ({ collectionUid }) => {
     dispatch(updateCollectionTagsList({ collectionUid }));
   }, [collection.uid, dispatch]);
 
+  const handleValidation = (tag) => {
+    const trimmedTag = tag.trim();
+    if (!availableTags.includes(trimmedTag)) {
+      return 'tag does not exist!';
+    }
+    if (tags.include.includes(trimmedTag)) {
+      return 'tag already present in the include list!';
+    }
+    if (tags.exclude.includes(trimmedTag)) {
+      return 'tag is present in the exclude list!';
+    }
+  }
 
   const handleAddTag = ({ tag, to }) => {
     const trimmedTag = tag.trim();
     if (!trimmedTag) return;
     // add tag to the `include` list
     if (to === 'include') {
-      if (tags.include.includes(trimmedTag)) return;
+      if (tags.include.includes(trimmedTag) || tags.exclude.includes(trimmedTag)) return;
+      if (!availableTags.includes(trimmedTag)) {
+        return;
+      }
       const newTags = { ...tags, include: [...tags.include, trimmedTag].sort() };
       setTags(newTags);
       return;
     }
     // add tag to the `exclude` list
     if (to === 'exclude') {
-      if (tags.exclude.includes(trimmedTag)) return;
+      if (tags.include.includes(trimmedTag) || tags.exclude.includes(trimmedTag)) return;
+      if (!availableTags.includes(trimmedTag)) {
+        return;
+      }
       const newTags = { ...tags, exclude: [...tags.exclude, trimmedTag].sort() };
       setTags(newTags);
     }
@@ -81,22 +99,24 @@ const RunnerTags = ({ collectionUid }) => {
       </div>
       {tagsEnabled && (
         <div className="flex flex-row mt-4 gap-4 w-full justify-between">
-          <div className="w-1/2">
+          <div className="w-1/2 flex flex-col gap-2">
             <span>Included tags:</span>
             <TagList
               tags={tags.include}
               handleAddTag={tag => handleAddTag({ tag, to: 'include' })}
               handleRemoveTag={tag => handleRemoveTag({ tag, from: 'include' })}
               tagsHintList={tagsHintList}
+              handleValidation={handleValidation}
             />
           </div>
-          <div className="w-1/2">
+          <div className="w-1/2 flex flex-col gap-2">
             <span>Excluded tags:</span>
             <TagList
               tags={tags.exclude}
               handleAddTag={tag => handleAddTag({ tag, to: 'exclude' })}
               handleRemoveTag={tag => handleRemoveTag({ tag, from: 'exclude' })}
               tagsHintList={tagsHintList}
+              handleValidation={handleValidation}
             />
           </div>
         </div>

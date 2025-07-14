@@ -1848,6 +1848,7 @@ export const collectionsSlice = createSlice({
             currentItem.name = file.data.name;
             currentItem.type = file.data.type;
             currentItem.seq = file.data.seq;
+            currentItem.tags = file.data.tags;
             currentItem.request = file.data.request;
             currentItem.filename = file.meta.name;
             currentItem.pathname = file.meta.pathname;
@@ -1862,6 +1863,7 @@ export const collectionsSlice = createSlice({
               name: file.data.name,
               type: file.data.type,
               seq: file.data.seq,
+              tags: file.data.tags,
               request: file.data.request,
               filename: file.meta.name,
               pathname: file.meta.pathname,
@@ -1951,6 +1953,7 @@ export const collectionsSlice = createSlice({
             item.name = file.data.name;
             item.type = file.data.type;
             item.seq = file.data.seq;
+            item.tags = file.data.tags;
             item.request = file.data.request;
             item.filename = file.meta.name;
             item.pathname = file.meta.pathname;
@@ -2351,9 +2354,9 @@ export const collectionsSlice = createSlice({
           if (!item.draft) {
             item.draft = cloneDeep(item);
           }
-          item.draft.request.tags = item.draft.request.tags || [];
-          if (!item.draft.request.tags.includes(tag.trim())) {
-            item.draft.request.tags.push(tag.trim());
+          item.draft.tags = item.draft.tags || [];
+          if (!item.draft.tags.includes(tag.trim())) {
+            item.draft.tags.push(tag.trim());
           }
 
           collection.allTags = getUniqueTagsFromItems(collection.items);
@@ -2371,8 +2374,8 @@ export const collectionsSlice = createSlice({
           if (!item.draft) {
             item.draft = cloneDeep(item);
           }
-          item.draft.request.tags = item.draft.request.tags || [];
-          item.draft.request.tags = item.draft.request.tags.filter((t) => t !== tag.trim());
+          item.draft.tags = item.draft.tags || [];
+          item.draft.tags = item.draft.tags.filter((t) => t !== tag.trim());
 
           collection.allTags = getUniqueTagsFromItems(collection.items);
         }

@@ -11,7 +11,7 @@ const Tags = ({ item, collection }) => {
   const collectionTags = collection.allTags || [];
 
   // tags for the current request
-  const tags = item.draft ? get(item, 'draft.request.tags', []) : get(item, 'request.tags', []);
+  const tags = item.draft ? get(item, 'draft.tags', []) : get(item, 'tags', []);
 
   // Filter out tags that are already associated with the current request
   const collectionTagsWithoutCurrentRequestTags = collectionTags?.filter(tag => !tags.includes(tag)) || [];
