@@ -32,7 +32,10 @@ const importCollection = () => {
       .then(updateUidsInCollection)
       .then(transformItemsInCollection)
       .then(validateSchema)
-      .then((collection) => resolve({ collection }))
+      .then((collection) => {
+        console.log("hererere", collection);
+        resolve({ collection })
+      })
       .catch((err) => {
         console.log(err);
         reject(new BrunoError('Import collection failed'));

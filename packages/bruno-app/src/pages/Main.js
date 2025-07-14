@@ -46,7 +46,7 @@ window.ipcRenderer = {
   invoke: async (channel, ...args) => { 
     console.log(channel, args, typeof request.makeRequest);
     if (channel === 'send-http-request') {
-      const [ item, collection, environment, ...rest ] = args;
+      const [ item, collection, environment, rest ] = args;
       const envVariables = getEnvVars(environment);
       const _res = await request.makeRequest({
         item,

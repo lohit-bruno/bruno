@@ -14,6 +14,7 @@ const ImportCollection = ({ onClose, handleSubmit }) => {
   const handleImportBrunoCollection = () => {
     importBrunoCollection()
       .then(({ collection }) => {
+        console.log({ collection });
         handleSubmit({ collection });
       })
       .catch((err) => toastError(err, 'Import collection failed'))

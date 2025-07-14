@@ -9,7 +9,7 @@ import { IconDots } from '@tabler/icons';
 import { useState, forwardRef, useRef } from 'react';
 import { useDispatch } from 'react-redux';
 import { showHomePage } from 'providers/ReduxStore/slices/app';
-import { openCollection, importCollection } from 'providers/ReduxStore/slices/collections/actions';
+import { openCollection, importCollection, importCollectionToApp } from 'providers/ReduxStore/slices/collections/actions';
 import StyledWrapper from './StyledWrapper';
 import { multiLineMsg } from "utils/common";
 import { formatIpcError } from "utils/common/error";
@@ -23,13 +23,21 @@ const TitleBar = () => {
   const { ipcRenderer } = window;
 
   const handleImportCollection = ({ collection }) => {
-    setImportedCollection(collection);
-    setImportCollectionModalOpen(false);
-    setImportCollectionLocationModalOpen(true);
+    console.log({ collection });
+    dispatch(importCollectionToApp(collection))
+      .then(() => {
+        // setImportCollectionLocationModalOpen(false);
+        setImportedCollection(null);
+        toast.success('Collection imported successfully');
+      })
+      .catch((err) => {
+        console.error(err);
+        toast.error(multiLineMsg('An error occurred while importing the collection.', formatIpcError(err)));
+      });
   };
 
   const handleImportCollectionLocation = (collectionLocation) => {
-    dispatch(importCollection(importedCollection, collectionLocation))
+    dispatch(importCollectionToApp(importedCollection))
       .then(() => {
         setImportCollectionLocationModalOpen(false);
         setImportedCollection(null);

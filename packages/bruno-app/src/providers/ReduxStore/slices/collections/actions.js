@@ -1216,6 +1216,132 @@ export const importCollection = (collection, collectionLocation) => (dispatch, g
   });
 };
 
+export const importCollectionToApp = (collection) => (dispatch, getState) => {
+  return new Promise((resolve, reject) => {
+    try {
+      // Generate unique collection UID
+      const collectionUid = uuid();
+      
+      // Create the collection object with proper structure
+      const collectionToAdd = {
+        version: '1',
+        uid: collectionUid,
+        name: collection.name,
+        pathname: null, // No filesystem path since we're importing directly to app
+        items: collection.items || [],
+        runtimeVariables: {},
+        brunoConfig: collection.brunoConfig || {
+          version: '1',
+          name: collection.name,
+          type: 'collection',
+          ignore: ['node_modules', '.git']
+        },
+        environments: collection.environments || [],
+        activeEnvironmentUid: collection.activeEnvironmentUid || null,
+        root: collection.root || null
+      };
+
+      // Generate UIDs for all items recursively
+      const generateUidsInItems = (items) => {
+        each(items, (item) => {
+          if (!item.uid) {
+            item.uid = uuid();
+          }
+          if (item.items && item.items.length) {
+            generateUidsInItems(item.items);
+          }
+          // Generate UIDs for request components
+          if (item.request) {
+            if (item.request.headers) {
+              each(item.request.headers, (header) => {
+                if (!header.uid) header.uid = uuid();
+              });
+            }
+            if (item.request.params) {
+              each(item.request.params, (param) => {
+                if (!param.uid) param.uid = uuid();
+              });
+            }
+            if (item.request.body) {
+              if (item.request.body.formUrlEncoded) {
+                each(item.request.body.formUrlEncoded, (param) => {
+                  if (!param.uid) param.uid = uuid();
+                });
+              }
+              if (item.request.body.multipartForm) {
+                each(item.request.body.multipartForm, (param) => {
+                  if (!param.uid) param.uid = uuid();
+                });
+              }
+              if (item.request.body.file) {
+                each(item.request.body.file, (file) => {
+                  if (!file.uid) file.uid = uuid();
+                });
+              }
+            }
+            if (item.request.vars) {
+              if (item.request.vars.req) {
+                each(item.request.vars.req, (variable) => {
+                  if (!variable.uid) variable.uid = uuid();
+                });
+              }
+              if (item.request.vars.res) {
+                each(item.request.vars.res, (variable) => {
+                  if (!variable.uid) variable.uid = uuid();
+                });
+              }
+            }
+            if (item.request.assertions) {
+              each(item.request.assertions, (assertion) => {
+                if (!assertion.uid) assertion.uid = uuid();
+              });
+            }
+          }
+        });
+      };
+
+      // Generate UIDs for environments
+      const generateUidsInEnvironments = (environments) => {
+        each(environments, (env) => {
+          if (!env.uid) {
+            env.uid = uuid();
+          }
+          if (env.variables) {
+            each(env.variables, (variable) => {
+              if (!variable.uid) variable.uid = uuid();
+            });
+          }
+        });
+      };
+
+      // Generate UIDs for all nested structures
+      generateUidsInItems(collectionToAdd.items);
+      generateUidsInEnvironments(collectionToAdd.environments);
+
+      // Validate the collection against the schema
+      collectionSchema
+        .validate(collectionToAdd)
+        .then(() => {
+          // Add the collection to Redux state using the existing action
+          dispatch(_createCollection({ 
+            ...collectionToAdd, 
+            securityConfig: { jsSandboxMode: 'safe' } // Default security config
+          }));
+          
+          toast.success('Collection imported successfully');
+          resolve(collectionToAdd);
+        })
+        .catch((validationError) => {
+          toast.error('Failed to import collection: Invalid collection format');
+          reject(validationError);
+        });
+    } catch (error) {
+      toast.error('Failed to import collection');
+      reject(error);
+    }
+  });
+};
+
 export const moveCollectionAndPersist = ({ draggedItem, targetItem }) => (dispatch, getState) => {
   dispatch(moveCollection({ draggedItem, targetItem }));
 
