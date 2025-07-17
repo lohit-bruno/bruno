@@ -3,17 +3,13 @@ const { getPreferences, savePreferences, preferencesUtil } = require('../store/p
 const { isDirectory } = require('../utils/filesystem');
 const { openCollection } = require('../app/collections');
 const { globalEnvironmentsStore } = require('../store/global-environments');
+const { getSystemProxy } = require('@usebruno/requests').utils;
 ``;
 const registerPreferencesIpc = (mainWindow, watcher, lastOpenedCollections) => {
   ipcMain.handle('renderer:ready', async (event) => {
     // load preferences
     const preferences = getPreferences();
     mainWindow.webContents.send('main:load-preferences', preferences);
-
-    // load system proxy vars
-    const systemProxyVars = preferencesUtil.getSystemProxyEnvVariables();
-    const { http_proxy, https_proxy, no_proxy } = systemProxyVars || {};
-    mainWindow.webContents.send('main:load-system-proxy-env', { http_proxy, https_proxy, no_proxy });
 
     // load global environments
     const globalEnvironments = globalEnvironmentsStore.getGlobalEnvironments();
@@ -46,6 +42,11 @@ const registerPreferencesIpc = (mainWindow, watcher, lastOpenedCollections) => {
     } catch (error) {
       return Promise.reject(error);
     }
+  });
+
+  ipcMain.handle('renderer:get-system-proxy-variables', async () => {
+    const systemProxyConfig = await getSystemProxy(); // ?
+    return systemProxyConfig;
   });
 };
 

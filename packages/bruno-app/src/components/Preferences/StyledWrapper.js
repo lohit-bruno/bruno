@@ -2,6 +2,8 @@ import styled from 'styled-components';
 
 const StyledWrapper = styled.div`
   div.tabs {
+    background-color: ${(props) => props.theme.preferences.sidebar.bg};
+    border-right: solid 1px ${(props) => props.theme.preferences.sidebar.borderRight};
     div.tab {
       width: 100%;
       min-width: 120px;

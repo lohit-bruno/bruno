@@ -1,10 +1,11 @@
 import { Checkbox, Inner, Label, Switch, SwitchButton } from './StyledWrapper';
 
-const ToggleSwitch = ({ isOn, handleToggle, size = 'm', ...props }) => {
+const ToggleSwitch = ({ id = '', isOn, handleToggle, size = 'm', ...props }) => {
+  id = `toggle-switch-${id}`
   return (
     <Switch size={size} {...props}>
-      <Checkbox checked={isOn} onChange={handleToggle} id="toggle-switch" type="checkbox" size={size} />
-      <Label htmlFor="toggle-switch">
+      <Checkbox checked={isOn} onChange={handleToggle} id={id} type="checkbox" size={size} />
+      <Label htmlFor={id}>
         <Inner size={size} />
         <SwitchButton size={size} />
       </Label>

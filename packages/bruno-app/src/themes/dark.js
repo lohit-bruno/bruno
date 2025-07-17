@@ -325,7 +325,14 @@ const darkTheme = {
     scrollbarTrack: '#2d2d30',
     scrollbarThumb: '#5a5a5a',
     scrollbarThumbHover: '#6a6a6a'
-  }
+  },
+
+  preferences: {
+    sidebar: {
+      bg: '#212121',
+      borderRight: 'transparent'
+    }
+  },
 };
 
 export default darkTheme;

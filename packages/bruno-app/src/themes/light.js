@@ -326,7 +326,14 @@ const lightTheme = {
     scrollbarTrack: '#f8f9fa',
     scrollbarThumb: '#ced4da',
     scrollbarThumbHover: '#adb5bd'
-  }
+  },
+
+  preferences: {
+    sidebar: {
+      bg: '#fff',
+      borderRight: '#f1f1f1'
+    }
+  },
 };
 
 export default lightTheme;

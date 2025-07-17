@@ -18,6 +18,7 @@ const { SocksProxyAgent } = require('socks-proxy-agent');
 const { makeAxiosInstance } = require('../utils/axios-instance');
 const { addAwsV4Interceptor, resolveAwsV4Credentials } = require('./awsv4auth-helper');
 const { shouldUseProxy, PatchedHttpsProxyAgent, getSystemProxyEnvVariables } = require('../utils/proxy-util');
+const { getSystemProxy } = require('@usebruno/requests').utils;
 const path = require('path');
 const { parseDataFromResponse } = require('../utils/common');
 const { getCookieStringForUrl, saveCookies, shouldUseCookies } = require('../utils/cookies');
@@ -224,9 +225,18 @@ const runSingleRequest = async function (
       proxyMode = 'on';
     } else if (collectionProxyEnabled === 'global') {
       // If collection proxy is set to 'global', use system proxy
-      const { http_proxy, https_proxy } = getSystemProxyEnvVariables();
-      if (http_proxy?.length || https_proxy?.length) {
-        proxyMode = 'system';
+      try {
+        const systemProxy = await getSystemProxy();
+        const { http_proxy, https_proxy } = systemProxy;
+        if (http_proxy?.length || https_proxy?.length) {
+          proxyMode = 'system';
+        }
+      } catch (error) {
+        console.warn('Failed to detect system proxy, falling back to environment variables:', error.message);
+        const { http_proxy, https_proxy } = getSystemProxyEnvVariables();
+        if (http_proxy?.length || https_proxy?.length) {
+          proxyMode = 'system';
+        }
       }
     } else {
       proxyMode = 'off';
@@ -269,32 +279,64 @@ const runSingleRequest = async function (
         });
       }
     } else if (proxyMode === 'system') {
-      const { http_proxy, https_proxy, no_proxy } = getSystemProxyEnvVariables();
-      const shouldUseSystemProxy = shouldUseProxy(request.url, no_proxy || '');
-      if (shouldUseSystemProxy) {
-        try {
-          if (http_proxy?.length) {
-            new URL(http_proxy);
-            request.httpAgent = new HttpProxyAgent(http_proxy);
+      try {
+        const systemProxy = await getSystemProxy();
+        const { http_proxy, https_proxy, no_proxy } = systemProxy;
+        const shouldUseSystemProxy = shouldUseProxy(request.url, no_proxy || '');
+        if (shouldUseSystemProxy) {
+          try {
+            if (http_proxy?.length) {
+              new URL(http_proxy);
+              request.httpAgent = new HttpProxyAgent(http_proxy);
+            }
+          } catch (error) {
+            throw new Error('Invalid system http_proxy');
           }
-        } catch (error) {
-          throw new Error('Invalid system http_proxy');
-        }
-        try {
-          if (https_proxy?.length) {
-            new URL(https_proxy);
-            request.httpsAgent = new PatchedHttpsProxyAgent(
-              https_proxy,
-              Object.keys(httpsAgentRequestFields).length > 0 ? { ...httpsAgentRequestFields } : undefined
-            );
+          try {
+            if (https_proxy?.length) {
+              new URL(https_proxy);
+              request.httpsAgent = new PatchedHttpsProxyAgent(
+                https_proxy,
+                Object.keys(httpsAgentRequestFields).length > 0 ? { ...httpsAgentRequestFields } : undefined
+              );
+            }
+          } catch (error) {
+            throw new Error('Invalid system https_proxy');
           }
-        } catch (error) {
-          throw new Error('Invalid system https_proxy');
+        } else {
+          request.httpsAgent = new https.Agent({
+            ...httpsAgentRequestFields
+          });
         }
-      } else {
-        request.httpsAgent = new https.Agent({
-          ...httpsAgentRequestFields
-        });
+      } catch (error) {
+        console.warn('Failed to get system proxy configuration, falling back to environment variables:', error.message);
+        const { http_proxy, https_proxy, no_proxy } = getSystemProxyEnvVariables();
+        const shouldUseSystemProxy = shouldUseProxy(request.url, no_proxy || '');
+        if (shouldUseSystemProxy) {
+          try {
+            if (http_proxy?.length) {
+              new URL(http_proxy);
+              request.httpAgent = new HttpProxyAgent(http_proxy);
+            }
+          } catch (error) {
+            throw new Error('Invalid system http_proxy');
+          }
+          try {
+            if (https_proxy?.length) {
+              new URL(https_proxy);
+              request.httpsAgent = new PatchedHttpsProxyAgent(
+                https_proxy,
+                Object.keys(httpsAgentRequestFields).length > 0 ? { ...httpsAgentRequestFields } : undefined
+              );
+            }
+          } catch (error) {
+            throw new Error('Invalid system https_proxy');
+          }
+        } else {
+          request.httpsAgent = new https.Agent({
+            ...httpsAgentRequestFields
+          });
+        }
       }
     } else if (Object.keys(httpsAgentRequestFields).length > 0) {
       request.httpsAgent = new https.Agent({

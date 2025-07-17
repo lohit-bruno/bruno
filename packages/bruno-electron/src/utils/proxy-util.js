@@ -294,7 +294,7 @@ function createTimelineAgentClass(BaseAgentClass) {
   };
 }
 
-function setupProxyAgents({
+async function setupProxyAgents({
   requestConfig,
   proxyMode = 'off',
   proxyConfig,
@@ -315,33 +315,15 @@ function setupProxyAgents({
   if (proxyMode === 'on') {
     const shouldProxy = shouldUseProxy(requestConfig.url, get(proxyConfig, 'bypassProxy', ''));
     if (shouldProxy) {
-      const proxyProtocol = interpolateString(get(proxyConfig, 'protocol'), interpolationOptions);
-      const proxyHostname = interpolateString(get(proxyConfig, 'hostname'), interpolationOptions);
-      const proxyPort = interpolateString(get(proxyConfig, 'port'), interpolationOptions);
-      const proxyAuthEnabled = get(proxyConfig, 'auth.enabled', false);
-      const socksEnabled = proxyProtocol.includes('socks');
-
-      let uriPort = isUndefined(proxyPort) || isNull(proxyPort) ? '' : `:${proxyPort}`;
-      let proxyUri;
-      if (proxyAuthEnabled) {
-        const proxyAuthUsername = encodeURIComponent(interpolateString(get(proxyConfig, 'auth.username'), interpolationOptions));
-        const proxyAuthPassword = encodeURIComponent(interpolateString(get(proxyConfig, 'auth.password'), interpolationOptions));
-        proxyUri = `${proxyProtocol}://${proxyAuthUsername}:${proxyAuthPassword}@${proxyHostname}${uriPort}`;
+      // Check if we have new multi-proxy config format
+      const hasMultiProxyConfig = proxyConfig.configs && Object.keys(proxyConfig.configs).length > 0;
+      
+      if (hasMultiProxyConfig) {
+        // New multi-proxy configuration
+        setupMultiProxyAgents(requestConfig, proxyConfig, interpolationOptions, timeline, tlsOptions);
       } else {
-        proxyUri = `${proxyProtocol}://${proxyHostname}${uriPort}`;
-      }
-
-      if (socksEnabled) {
-        const TimelineSocksProxyAgent = createTimelineAgentClass(SocksProxyAgent);
-        requestConfig.httpAgent = new TimelineSocksProxyAgent({ proxy: proxyUri }, timeline);
-        requestConfig.httpsAgent = new TimelineSocksProxyAgent({ proxy: proxyUri, ...tlsOptions }, timeline);
-      } else {
-        const TimelineHttpsProxyAgent = createTimelineAgentClass(PatchedHttpsProxyAgent);
-        requestConfig.httpAgent = new HttpProxyAgent(proxyUri); // For http, no need for timeline
-        requestConfig.httpsAgent = new TimelineHttpsProxyAgent(
-          { proxy: proxyUri, ...tlsOptions },
-          timeline
-        );
+        // Legacy single proxy configuration (for backward compatibility)
+        setupLegacyProxyAgent(requestConfig, proxyConfig, interpolationOptions, timeline, tlsOptions);
       }
     } else {
       // If proxy should not be used, set default HTTPS agent
@@ -349,7 +331,9 @@ function setupProxyAgents({
       requestConfig.httpsAgent = new TimelineHttpsAgent(tlsOptions, timeline);
     }
   } else if (proxyMode === 'system') {
-    const { http_proxy, https_proxy, no_proxy } = preferencesUtil.getSystemProxyEnvVariables();
+    // Note: Using synchronous environment variable fallback for now
+    // TODO: Enhance to use async getSystemProxyConfig when axios interceptors support async
+    const { http_proxy, https_proxy, no_proxy } = await getSystemProxy();
     const shouldUseSystemProxy = shouldUseProxy(requestConfig.url, no_proxy || '');
     if (shouldUseSystemProxy) {
       try {
@@ -379,6 +363,105 @@ function setupProxyAgents({
   } else {
     const TimelineHttpsAgent = createTimelineAgentClass(https.Agent);
     requestConfig.httpsAgent = new TimelineHttpsAgent(tlsOptions, timeline);
+  }
+}
+
+function setupMultiProxyAgents(requestConfig, proxyConfig, interpolationOptions, timeline, tlsOptions) {
+  const url = new URL(requestConfig.url);
+  const protocol = url.protocol.replace(':', '');
+  
+  // Determine which proxy configuration to use based on the request protocol
+  let selectedProxyConfig = null;
+  let proxyType = null;
+
+  if (protocol === 'http' && proxyConfig.configs.http?.enabled) {
+    selectedProxyConfig = proxyConfig.configs.http;
+    proxyType = 'http';
+  } else if (protocol === 'https' && proxyConfig.configs.https?.enabled) {
+    selectedProxyConfig = proxyConfig.configs.https;
+    proxyType = 'https';
+  } else if (proxyConfig.configs.socks?.enabled) {
+    // SOCKS proxy can handle both HTTP and HTTPS
+    selectedProxyConfig = proxyConfig.configs.socks;
+    proxyType = 'socks';
+  }
+
+  if (!selectedProxyConfig) {
+    // No proxy configuration found for this protocol, use direct connection
+    const TimelineHttpsAgent = createTimelineAgentClass(https.Agent);
+    requestConfig.httpsAgent = new TimelineHttpsAgent(tlsOptions, timeline);
+    return;
+  }
+
+  // Build proxy URI
+  const proxyHostname = interpolateString(selectedProxyConfig.hostname, interpolationOptions);
+  const proxyPort = interpolateString(selectedProxyConfig.port, interpolationOptions);
+  const proxyAuthEnabled = get(selectedProxyConfig, 'auth.enabled', false);
+  
+  let uriPort = isUndefined(proxyPort) || isNull(proxyPort) ? '' : `:${proxyPort}`;
+  let proxyUri;
+
+  if (proxyType === 'socks') {
+    const socksProtocol = selectedProxyConfig.protocol || 'socks5';
+    if (proxyAuthEnabled) {
+      const proxyAuthUsername = encodeURIComponent(interpolateString(get(selectedProxyConfig, 'auth.username'), interpolationOptions));
+      const proxyAuthPassword = encodeURIComponent(interpolateString(get(selectedProxyConfig, 'auth.password'), interpolationOptions));
+      proxyUri = `${socksProtocol}://${proxyAuthUsername}:${proxyAuthPassword}@${proxyHostname}${uriPort}`;
+    } else {
+      proxyUri = `${socksProtocol}://${proxyHostname}${uriPort}`;
+    }
+
+    const TimelineSocksProxyAgent = createTimelineAgentClass(SocksProxyAgent);
+    requestConfig.httpAgent = new TimelineSocksProxyAgent({ proxy: proxyUri }, timeline);
+    requestConfig.httpsAgent = new TimelineSocksProxyAgent({ proxy: proxyUri, ...tlsOptions }, timeline);
+  } else {
+    // HTTP/HTTPS proxy
+    const httpProtocol = proxyType === 'https' ? 'https' : 'http';
+    if (proxyAuthEnabled) {
+      const proxyAuthUsername = encodeURIComponent(interpolateString(get(selectedProxyConfig, 'auth.username'), interpolationOptions));
+      const proxyAuthPassword = encodeURIComponent(interpolateString(get(selectedProxyConfig, 'auth.password'), interpolationOptions));
+      proxyUri = `${httpProtocol}://${proxyAuthUsername}:${proxyAuthPassword}@${proxyHostname}${uriPort}`;
+    } else {
+      proxyUri = `${httpProtocol}://${proxyHostname}${uriPort}`;
+    }
+
+    const TimelineHttpsProxyAgent = createTimelineAgentClass(PatchedHttpsProxyAgent);
+    requestConfig.httpAgent = new HttpProxyAgent(proxyUri);
+    requestConfig.httpsAgent = new TimelineHttpsProxyAgent(
+      { proxy: proxyUri, ...tlsOptions },
+      timeline
+    );
+  }
+}
+
+function setupLegacyProxyAgent(requestConfig, proxyConfig, interpolationOptions, timeline, tlsOptions) {
+  const proxyProtocol = interpolateString(get(proxyConfig, 'protocol'), interpolationOptions);
+  const proxyHostname = interpolateString(get(proxyConfig, 'hostname'), interpolationOptions);
+  const proxyPort = interpolateString(get(proxyConfig, 'port'), interpolationOptions);
+  const proxyAuthEnabled = get(proxyConfig, 'auth.enabled', false);
+  const socksEnabled = proxyProtocol.includes('socks');
+
+  let uriPort = isUndefined(proxyPort) || isNull(proxyPort) ? '' : `:${proxyPort}`;
+  let proxyUri;
+  if (proxyAuthEnabled) {
+    const proxyAuthUsername = encodeURIComponent(interpolateString(get(proxyConfig, 'auth.username'), interpolationOptions));
+    const proxyAuthPassword = encodeURIComponent(interpolateString(get(proxyConfig, 'auth.password'), interpolationOptions));
+    proxyUri = `${proxyProtocol}://${proxyAuthUsername}:${proxyAuthPassword}@${proxyHostname}${uriPort}`;
+  } else {
+    proxyUri = `${proxyProtocol}://${proxyHostname}${uriPort}`;
+  }
+
+  if (socksEnabled) {
+    const TimelineSocksProxyAgent = createTimelineAgentClass(SocksProxyAgent);
+    requestConfig.httpAgent = new TimelineSocksProxyAgent({ proxy: proxyUri }, timeline);
+    requestConfig.httpsAgent = new TimelineSocksProxyAgent({ proxy: proxyUri, ...tlsOptions }, timeline);
+  } else {
+    const TimelineHttpsProxyAgent = createTimelineAgentClass(PatchedHttpsProxyAgent);
+    requestConfig.httpAgent = new HttpProxyAgent(proxyUri); // For http, no need for timeline
+    requestConfig.httpsAgent = new TimelineHttpsProxyAgent(
+      { proxy: proxyUri, ...tlsOptions },
+      timeline
+    );
   }
 }
 

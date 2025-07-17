@@ -36,7 +36,41 @@ const defaultPreferences = {
       username: '',
       password: ''
     },
-    bypassProxy: ''
+    bypassProxy: '',
+    // New multi-proxy configuration
+    configs: {
+      http: {
+        enabled: false,
+        hostname: '',
+        port: null,
+        auth: {
+          enabled: false,
+          username: '',
+          password: ''
+        }
+      },
+      https: {
+        enabled: false,
+        hostname: '',
+        port: null,
+        auth: {
+          enabled: false,
+          username: '',
+          password: ''
+        }
+      },
+      socks: {
+        enabled: false,
+        protocol: 'socks5',
+        hostname: '',
+        port: null,
+        auth: {
+          enabled: false,
+          username: '',
+          password: ''
+        }
+      }
+    }
   },
   layout: {
     responsePaneOrientation: 'horizontal'
@@ -63,6 +97,7 @@ const preferencesSchema = Yup.object().shape({
   }),
   proxy: Yup.object({
     mode: Yup.string().oneOf(['off', 'on', 'system']),
+    // Legacy fields for backward compatibility
     protocol: Yup.string().oneOf(['http', 'https', 'socks4', 'socks5']),
     hostname: Yup.string().max(1024),
     port: Yup.number().min(1).max(65535).nullable(),
@@ -71,7 +106,41 @@ const preferencesSchema = Yup.object().shape({
       username: Yup.string().max(1024),
       password: Yup.string().max(1024)
     }).optional(),
-    bypassProxy: Yup.string().optional().max(1024)
+    bypassProxy: Yup.string().optional().max(1024),
+    // New multi-proxy configuration schema
+    configs: Yup.object({
+      http: Yup.object({
+        enabled: Yup.boolean(),
+        hostname: Yup.string().max(1024),
+        port: Yup.number().min(1).max(65535).nullable(),
+        auth: Yup.object({
+          enabled: Yup.boolean(),
+          username: Yup.string().max(1024),
+          password: Yup.string().max(1024)
+        }).optional()
+      }).optional(),
+      https: Yup.object({
+        enabled: Yup.boolean(),
+        hostname: Yup.string().max(1024),
+        port: Yup.number().min(1).max(65535).nullable(),
+        auth: Yup.object({
+          enabled: Yup.boolean(),
+          username: Yup.string().max(1024),
+          password: Yup.string().max(1024)
+        }).optional()
+      }).optional(),
+      socks: Yup.object({
+        enabled: Yup.boolean(),
+        protocol: Yup.string().oneOf(['socks4', 'socks5']),
+        hostname: Yup.string().max(1024),
+        port: Yup.number().min(1).max(65535).nullable(),
+        auth: Yup.object({
+          enabled: Yup.boolean(),
+          username: Yup.string().max(1024),
+          password: Yup.string().max(1024)
+        }).optional()
+      }).optional()
+    }).optional()
   }),
   layout: Yup.object({
     responsePaneOrientation: Yup.string().oneOf(['horizontal', 'vertical'])
@@ -100,6 +169,55 @@ class PreferencesStore {
     // This is a part of migration to the new preferences format
     if (preferences?.proxy && 'enabled' in preferences.proxy) {
       delete preferences.proxy.enabled;
+    }
+
+    // Migration: Convert old single-proxy config to multi-proxy format
+    if (preferences?.proxy && !preferences?.proxy?.configs) {
+      const oldProxy = preferences.proxy;
+      if (oldProxy.hostname || oldProxy.port) {
+        preferences.proxy.configs = {
+          http: { enabled: false, hostname: '', port: null, auth: { enabled: false, username: '', password: '' } },
+          https: { enabled: false, hostname: '', port: null, auth: { enabled: false, username: '', password: '' } },
+          socks: { enabled: false, protocol: 'socks5', hostname: '', port: null, auth: { enabled: false, username: '', password: '' } }
+        };
+
+        // Migrate based on the old protocol setting
+        if (oldProxy.protocol === 'http') {
+          preferences.proxy.configs.http = {
+            enabled: true,
+            hostname: oldProxy.hostname || '',
+            port: oldProxy.port || null,
+            auth: {
+              enabled: oldProxy.auth?.enabled || false,
+              username: oldProxy.auth?.username || '',
+              password: oldProxy.auth?.password || ''
+            }
+          };
+        } else if (oldProxy.protocol === 'https') {
+          preferences.proxy.configs.https = {
+            enabled: true,
+            hostname: oldProxy.hostname || '',
+            port: oldProxy.port || null,
+            auth: {
+              enabled: oldProxy.auth?.enabled || false,
+              username: oldProxy.auth?.username || '',
+              password: oldProxy.auth?.password || ''
+            }
+          };
+        } else if (oldProxy.protocol === 'socks4' || oldProxy.protocol === 'socks5') {
+          preferences.proxy.configs.socks = {
+            enabled: true,
+            protocol: oldProxy.protocol,
+            hostname: oldProxy.hostname || '',
+            port: oldProxy.port || null,
+            auth: {
+              enabled: oldProxy.auth?.enabled || false,
+              username: oldProxy.auth?.username || '',
+              password: oldProxy.auth?.password || ''
+            }
+          };
+        }
+      }
     }
 
     return merge({}, defaultPreferences, preferences);
@@ -157,14 +275,6 @@ const preferencesUtil = {
   },
   getResponsePaneOrientation: () => {
     return get(getPreferences(), 'layout.responsePaneOrientation', 'horizontal');
-  },
-  getSystemProxyEnvVariables: () => {
-    const { http_proxy, HTTP_PROXY, https_proxy, HTTPS_PROXY, no_proxy, NO_PROXY } = process.env;
-    return {
-      http_proxy: http_proxy || HTTP_PROXY,
-      https_proxy: https_proxy || HTTPS_PROXY,
-      no_proxy: no_proxy || NO_PROXY
-    };
   }
 };
 
