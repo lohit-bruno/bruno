@@ -10,7 +10,7 @@ import ErrorBoundary from './ErrorBoundary';
 
 import { request } from '@usebruno/requests-common';
 
-import { ScriptRuntime } from '@usebruno/js-common';
+import { ScriptRuntime } from '@usebruno/safe-mode';
 const scriptRuntime = new ScriptRuntime();
 
 (async () => {

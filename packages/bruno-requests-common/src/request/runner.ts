@@ -12,7 +12,7 @@ import {
 import { interpolateRequest, createCombinedVariables } from './interpolation';
 import { AxiosRequestConfig } from 'axios';
 import { makeAxiosInstance } from '../network';
-const { ScriptRuntime } = require('@usebruno/js-common');
+const { ScriptRuntime } = require('@usebruno/safe-mode');
 
 // Platform-specific interfaces that need to be implemented
 export interface BrunoHttpClient {

@@ -16,7 +16,8 @@
     "packages/bruno-graphql-docs",
     "packages/bruno-requests",
     "packages/bruno-js-common",
-    "packages/bruno-requests-common"
+    "packages/bruno-requests-common",
+    "packages/bruno-safe-mode"
   ],
   "homepage": "https://usebruno.com",
   "devDependencies": {
@@ -44,6 +45,7 @@
     "dev": "concurrently --kill-others \"npm run dev:web\" \"npm run dev:electron\"",
     "dev:watch": "node ./scripts/dev-hot-reload.js",
     "dev:web": "npm run dev --workspace=packages/bruno-app",
+    "build:safe-mode": "npm run build --workspace=packages/bruno-safe-mode",
     "build:web": "npm run build --workspace=packages/bruno-app",
     "prettier:web": "npm run prettier --workspace=packages/bruno-app",
     "dev:electron": "npm run dev --workspace=packages/bruno-electron",
