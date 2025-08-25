@@ -140,6 +140,58 @@ const importCollectionLevelVariables = (variables, requestObject) => {
   requestObject.vars.req = vars;
 };
 
+const mapPostmanSendInToBruno = (sendIn, allowedValues) => {
+  const mapping = {
+    'request_body': 'body',
+    'request_url': 'queryparams',
+    'request_header': 'headers'
+  };
+
+  const mapped = mapping[sendIn];
+  return allowedValues.includes(mapped) ? mapped : allowedValues[0]; // Default to first allowed value
+};
+
+const processParameterArray = (paramArray = [], allowedSendInValues) => {
+  const filteredParams = paramArray.filter(param => ['request_body', 'request_url', 'request_header'].includes(param.send_as));
+
+  if (!Array.isArray(filteredParams) || filteredParams.length === 0) {
+    return undefined;
+  }
+
+  return filteredParams.map(param => ({
+    name: param.key || param.name || '',
+    value: param.value || '',
+    sendIn: mapPostmanSendInToBruno(param.send_as, allowedSendInValues),
+    enabled: param.enabled || false
+  }));
+};
+
+const processOAuth2AdditionalParameters = (authValues) => {
+  const additionalParameters = {};
+
+  // Map Postman's additional parameter arrays to Bruno's format
+  // Handle authorization parameters (for authorization_code flows)
+  const authRequestParams = processParameterArray(authValues['authRequestParams'], ['queryparams', 'headers']);
+  if (authRequestParams) {
+    additionalParameters.authorization = authRequestParams;
+  }
+
+  // Handle token request parameters  
+  const tokenRequestParams = processParameterArray(authValues['tokenRequestParams'], ['queryparams', 'headers', 'body']);
+  if (tokenRequestParams) {
+    additionalParameters.token = tokenRequestParams;
+  }
+
+  // Handle refresh token request parameters
+  const refreshRequestParams = processParameterArray(authValues['refreshRequestParams'], ['queryparams', 'headers', 'body']);
+  if (refreshRequestParams) {
+    additionalParameters.refresh = refreshRequestParams;
+  }
+
+  return Object.keys(additionalParameters).length > 0 ? additionalParameters : undefined;
+};
+
+
 export const processAuth = (auth, requestObject, isCollection = false) => {
   // As of 14/05/2025
   // When collections are set to "No Auth" in Postman, the auth object is null.
@@ -214,6 +266,9 @@ export const processAuth = (auth, requestObject, isCollection = false) => {
       const postmanGrantType = findValueUsingKey('grant_type');
       const targetGrantType = oauth2GrantTypeMaps[postmanGrantType] || 'client_credentials'; // Default
 
+      // Process additional parameters for OAuth2
+      const additionalParameters = processOAuth2AdditionalParameters(authValues);
+
       // Common properties for all OAuth2 grant types
       const baseOAuth2Config = {
         grantType: targetGrantType,
@@ -226,6 +281,11 @@ export const processAuth = (auth, requestObject, isCollection = false) => {
         tokenPlacement: findValueUsingKey('addTokenTo') === 'header' ? 'header' : 'url',
         credentialsPlacement: findValueUsingKey('client_authentication') === 'body' ? 'body' : 'basic_auth_header'
       };
+
+      // Add additional parameters if present
+      if (additionalParameters) {
+        baseOAuth2Config.additionalParameters = additionalParameters;
+      }
 
       switch (postmanGrantType) {
         case 'authorization_code':
