@@ -1,12 +1,12 @@
 {
   "maximized": true,
-  "lastOpenedCollections": ["{{projectRoot}}/packages/bruno-tests/ca_certs/collection"],
+  "lastOpenedCollections": ["{{projectRoot}}/e2e-tests/ca_certs/collection"],
   "preferences": {
 		"request": {
 			"sslVerification": true,
 			"customCaCertificate": {
-				"enabled": false,
-				"filePath": ""
+				"enabled": true,
+				"filePath": "{{projectRoot}}/e2e-tests/ca_certs/server/certs/ca-cert.pem"
 			},
 			"keepDefaultCaCertificates": {
 				"enabled": false

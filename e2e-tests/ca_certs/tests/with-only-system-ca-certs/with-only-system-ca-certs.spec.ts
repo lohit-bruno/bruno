@@ -1,6 +1,6 @@
-import { test, expect } from '../../../playwright';
+import { test, expect } from '../../../../playwright';
 
-test.describe.serial('with ssl/tls disabled', () => {
+test.describe.serial('with only system ca certs', () => {
   test('developer mode', async ({ pageWithUserData: page }) => {
 
     // init dev mode
@@ -21,7 +21,6 @@ test.describe.serial('with ssl/tls disabled', () => {
       throw new Error('Could not parse test results');
     }
     const [totalRequests, passed, failed, skipped] = matches.slice(1);
-
     await expect(parseInt(totalRequests)).toBe(2);
     await expect(parseInt(passed)).toBe(2);
     await expect(parseInt(failed)).toBe(0);
@@ -49,7 +48,6 @@ test.describe.serial('with ssl/tls disabled', () => {
       throw new Error('Could not parse test results');
     }
     const [totalRequests, passed, failed, skipped] = matches.slice(1);
-
     await expect(parseInt(totalRequests)).toBe(2);
     await expect(parseInt(passed)).toBe(2);
     await expect(parseInt(failed)).toBe(0);

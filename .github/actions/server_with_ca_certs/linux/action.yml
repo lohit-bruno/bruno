@@ -24,23 +24,23 @@ runs:
         sudo apt-get install -y openssl
         echo "OpenSSL installed on Linux"
 
-    # Create necessary directories for certificate storage
-    - name: Create certificate directories
+    # Clean up existing certificates and create fresh directories
+    - name: Clean up and create certificate directories
       shell: bash
       run: |
         set -euo pipefail
         echo "Cleaning up existing certificates..."
-        rm -rf packages/bruno-tests/ca_certs/certs
+        rm -rf e2e-tests/ca_certs/server/certs
         
         echo "Creating fresh certificate storage directories..."
-        mkdir -p packages/bruno-tests/ca_certs/certs
+        mkdir -p e2e-tests/ca_certs/server/certs
         echo "Certificate directories created successfully"
 
     # Generate CA certificate and server certificates
     - name: Generate CA certificates
       id: generate-certs
       shell: bash
-      working-directory: packages/bruno-tests/ca_certs
+      working-directory: e2e-tests/ca_certs/server
       run: |
         set -euo pipefail
         echo "Starting certificate generation process..."
@@ -59,7 +59,7 @@ runs:
     # Verify that all required certificates were generated
     - name: Verify certificate generation
       shell: bash
-      working-directory: packages/bruno-tests/ca_certs/certs
+      working-directory: e2e-tests/ca_certs/server/certs
       run: |
         set -euo pipefail
         echo "Verifying generated certificates..."
@@ -83,7 +83,7 @@ runs:
     # Add CA certificate to system truststore based on operating system
     - name: Add CA certificate to system truststore
       shell: bash
-      working-directory: packages/bruno-tests/ca_certs/certs
+      working-directory: e2e-tests/ca_certs/server/certs
       run: |
         set -euo pipefail
         echo "Adding CA certificate to system truststore for linux"
@@ -116,14 +116,14 @@ runs:
     - name: Verify server setup readiness
       id: verify-setup
       shell: bash
-      working-directory: packages/bruno-tests/ca_certs
+      working-directory: e2e-tests/ca_certs/server
       run: |
         set -euo pipefail
         echo "Verifying server setup readiness..."
         
         # Check that server script exists and is readable
-        if [[ ! -f "server.js" ]]; then
-          echo "Error: server.js not found"
+        if [[ ! -f "index.js" ]]; then
+          echo "Error: server file not found"
           echo "setup-status=failed" >> $GITHUB_OUTPUT
           exit 1
         fi
@@ -142,9 +142,17 @@ runs:
         done
         echo "All required certificates are present"
         
+        # Check and kill any existing process on port 8090
+        echo "Checking for existing process on port 8090..."
+        if lsof -i:8090 > /dev/null 2>&1; then
+          echo "Found existing process on port 8090, killing it..."
+          sudo kill $(lsof -t -i:8090) || true
+          sleep 2
+        fi
+        
         # start ca certs HTTPS server in background for testing
         echo "Testing server startup capability..."
-        node server.js > test_server.log 2>&1 &
+        node index.js > test_server.log 2>&1 &
         TEST_SERVER_PID=$!
         echo "started server with PID: $TEST_SERVER_PID"
 

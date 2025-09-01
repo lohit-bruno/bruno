@@ -1,6 +1,6 @@
-import { test, expect } from '../../../playwright';
+import { test, expect } from '../../../../playwright';
 
-test.describe.serial('with INVALID custom ca cert file and NO default/system ca certs', () => {
+test.describe.serial('with INVALID custom ca cert file and default/system ca certs', () => {
   test('developer mode', async ({ pageWithUserData: page }) => {
 
     // init dev mode
@@ -21,9 +21,10 @@ test.describe.serial('with INVALID custom ca cert file and NO default/system ca 
       throw new Error('Could not parse test results');
     }
     const [totalRequests, passed, failed, skipped] = matches.slice(1);
+    
     await expect(parseInt(totalRequests)).toBe(2);
-    await expect(parseInt(passed)).toBe(0);
-    await expect(parseInt(failed)).toBe(2);
+    await expect(parseInt(passed)).toBe(2);
+    await expect(parseInt(failed)).toBe(0);
     await expect(parseInt(skipped)).toBe(0);
     await expect(parseInt(passed)).toBe(parseInt(totalRequests) - parseInt(skipped) - parseInt(failed));
   });
@@ -48,9 +49,10 @@ test.describe.serial('with INVALID custom ca cert file and NO default/system ca 
       throw new Error('Could not parse test results');
     }
     const [totalRequests, passed, failed, skipped] = matches.slice(1);
+
     await expect(parseInt(totalRequests)).toBe(2);
-    await expect(parseInt(passed)).toBe(0);
-    await expect(parseInt(failed)).toBe(2);
+    await expect(parseInt(passed)).toBe(2);
+    await expect(parseInt(failed)).toBe(0);
     await expect(parseInt(skipped)).toBe(0);
     await expect(parseInt(passed)).toBe(parseInt(totalRequests) - parseInt(skipped) - parseInt(failed));
   });

@@ -1,4 +1,4 @@
-import { test, expect } from '../../../playwright';
+import { test, expect } from '../../../../playwright';
 
 test.describe.serial('with only VALID custom ca cert file and NO default/system ca certs', () => {
   test('developer mode', async ({ pageWithUserData: page }) => {
