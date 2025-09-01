@@ -1,7 +1,36 @@
-import * as tls from 'node:tls';
 import * as fs from 'node:fs';
+import { execSync } from 'node:child_process';
 
 type T_CACertSource = 'bundled' | 'system' | 'extra'
+
+/**
+ * Safely executes tls.getCACertificates in a separate Node.js process
+ * Returns empty array if the process fails or exits
+ */
+const safeTlsGetCACertificates = (certType: T_CACertSource): string[] => {
+  try {
+    const script = `
+      const tls = require('node:tls');
+      try {
+        const result = tls.getCACertificates('${certType}');
+        console.log(JSON.stringify(result || []));
+      } catch (error) {
+        console.log('[]');
+      }
+    `;
+    
+    const output = execSync(`node -e "${script.replace(/"/g, '\\"')}"`, {
+      encoding: 'utf8',
+      timeout: 5000, // 5 second timeout
+      stdio: 'pipe'
+    }).trim();
+    
+    return JSON.parse(output);
+  } catch (error) {
+    // Return empty array if child process fails
+    return [];
+  }
+};
 
 /**
  * retrieves default CA certificates from multiple sources using Node.js TLS API
@@ -21,7 +50,7 @@ const getCerts = (sources: T_CACertSource[] = ['bundled', 'system', 'extra']): s
   (sources).forEach(certType => {
     try {
       // get certificates from specific store type
-      const certList = tls.getCACertificates(certType);
+      const certList = safeTlsGetCACertificates(certType);
 
       if (certList && Array.isArray(certList)) {
         // filter out empty/invalid certificates to ensure we only include valid data
@@ -80,5 +109,6 @@ const getCACertificates = ({ caCertFilePath, shouldKeepDefaultCerts = true }: { 
 }
 
 export {
-  getCACertificates
+  getCACertificates,
+  safeTlsGetCACertificates
 };

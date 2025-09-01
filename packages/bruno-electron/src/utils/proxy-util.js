@@ -1,7 +1,7 @@
 const parseUrl = require('url').parse;
 const https = require('node:https');
-const tls = require('node:tls');
 const { HttpsProxyAgent } = require('https-proxy-agent');
+const { safeTlsGetCACertificates } = require('@usebruno/requests');
 const { interpolateString } = require('../ipc/network/interpolate-string');
 const { SocksProxyAgent } = require('socks-proxy-agent');
 const { HttpProxyAgent } = require('http-proxy-agent');
@@ -149,9 +149,9 @@ function createTimelineAgentClass(BaseAgentClass) {
         });
       }
 
-      const bundledCerts = tls.getCACertificates('bundled');
-      const systemCerts = tls.getCACertificates('system');
-      const extraCerts = tls.getCACertificates('extra');
+      const bundledCerts = safeTlsGetCACertificates('bundled');
+      const systemCerts = safeTlsGetCACertificates('system');
+      const extraCerts = safeTlsGetCACertificates('extra');
       const defaultCertsCount = bundledCerts.length + systemCerts.length + extraCerts.length;
       const providedCertsCount = this.providedCaCerts?.length;
 

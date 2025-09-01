@@ -14,6 +14,18 @@ script:pre-request {
   const runtime = req.getRuntime();
   if (runtime !== 'quickjs') {
     req.onFail(function(err) {
+    /**
+     * Relevant only for the below test cases
+     * 
+     * CLI test:
+     * `.github/workflows/ca_certs_tests_for_linux.yml`
+     * 
+     * With INVALID custom CA cert and NO default/system CA certs:
+     * node ../../../packages/bruno-cli/bin/bru.js run ./request_with_fail_test_case.bru --cacert ../server/certs/ca-key.pem --ignore-truststore
+     * 
+     * E2E test:
+     * `e2e-tests/ca_certs/tests/with-only-VALID-custom-ca-certs-and-NO-system-certs`
+     */
       test('should return ssl verification error', () => {
         expect(err.code).to.eql('UNABLE_TO_VERIFY_LEAF_SIGNATURE');
       });
@@ -24,6 +36,18 @@ script:pre-request {
 tests {
   const executionMode = req.getExecutionMode();
   if (executionMode == 'cli') {
+    /**
+     * Relevant only for the below test cases
+     * 
+     * CLI test:
+     * `.github/workflows/ca_certs_tests_for_linux.yml`
+     * 
+     * With INVALID custom CA cert and NO default/system CA certs:
+     * node ../../../packages/bruno-cli/bin/bru.js run ./request_with_fail_test_case.bru --cacert ../server/certs/ca-key.pem --ignore-truststore
+     * 
+     * E2E test:
+     * `e2e-tests/ca_certs/tests/with-only-VALID-custom-ca-certs-and-NO-system-certs`
+     */
     test('request should give an tls verification error, should not reach this point.', () => {
       expect(1).to.eql(2);
     });  
