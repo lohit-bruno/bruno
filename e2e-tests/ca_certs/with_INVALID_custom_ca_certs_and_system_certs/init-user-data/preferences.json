@@ -1,0 +1,16 @@
+{
+  "maximized": true,
+  "lastOpenedCollections": ["{{projectRoot}}/packages/bruno-tests/ca_certs/collection"],
+  "preferences": {
+		"request": {
+			"sslVerification": true,
+			"customCaCertificate": {
+				"enabled": true,
+				"filePath": "{{projectRoot}}/packages/bruno-tests/ca_certs/certs/ca-cert.key"
+			},
+			"keepDefaultCaCertificates": {
+				"enabled": true
+			}
+		}
+  }
+}

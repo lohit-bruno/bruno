@@ -29,11 +29,6 @@ export default defineConfig({
       command: 'npm run dev:web',
       url: 'http://localhost:3000',
       reuseExistingServer: !process.env.CI
-    },
-    {
-      command: 'npm start --workspace=packages/bruno-tests',
-      url: 'http://localhost:8081/ping',
-      reuseExistingServer: !process.env.CI
     }
   ]
 });

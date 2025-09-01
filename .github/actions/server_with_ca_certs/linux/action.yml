@@ -1,0 +1,198 @@
+name: 'setup server with ca certs for linux os'
+description: 'generate CA certificates, configure system trust, and prepare HTTPS test server'
+
+# Action outputs for consuming workflows
+outputs:
+  ca-cert-path:
+    description: 'Path to the generated CA certificate file'
+    value: ${{ steps.generate-certs.outputs.ca-cert-path }}
+  setup-status:
+    description: 'Status of the CA setup process (ready/failed)'
+    value: ${{ steps.verify-setup.outputs.setup-status }}
+
+runs:
+  using: 'composite'
+  steps:
+    # Install OpenSSL on different operating systems
+    - name: Install OpenSSL dependencies
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "Installing OpenSSL for certificate generation..."
+        
+        sudo apt-get update -q
+        sudo apt-get install -y openssl
+        echo "OpenSSL installed on Linux"
+
+    # Create necessary directories for certificate storage
+    - name: Create certificate directories
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "Cleaning up existing certificates..."
+        rm -rf packages/bruno-tests/ca_certs/certs
+        
+        echo "Creating fresh certificate storage directories..."
+        mkdir -p packages/bruno-tests/ca_certs/certs
+        echo "Certificate directories created successfully"
+
+    # Generate CA certificate and server certificates
+    - name: Generate CA certificates
+      id: generate-certs
+      shell: bash
+      working-directory: packages/bruno-tests/ca_certs
+      run: |
+        set -euo pipefail
+        echo "Starting certificate generation process..."
+        
+        # Make certificate generation script executable
+        chmod +x generate_certs.sh
+        
+        # Execute certificate generation
+        ./generate_certs.sh
+        
+        # Set output variable with absolute path to CA certificate
+        CA_CERT_PATH="$(pwd)/certs/ca-cert.pem"
+        echo "ca-cert-path=$CA_CERT_PATH" >> $GITHUB_OUTPUT
+        echo "Certificates generated successfully at $CA_CERT_PATH"
+
+    # Verify that all required certificates were generated
+    - name: Verify certificate generation
+      shell: bash
+      working-directory: packages/bruno-tests/ca_certs/certs
+      run: |
+        set -euo pipefail
+        echo "Verifying generated certificates..."
+        
+        # Check that all required certificate files exist
+        if [[ ! -f "ca-cert.pem" || ! -f "localhost-cert.pem" || ! -f "localhost-key.pem" ]]; then
+          echo "Error: Required certificate files are missing"
+          ls -la || true
+          exit 1
+        fi
+        
+        # Display certificate information for verification
+        echo "CA certificate information:"
+        openssl x509 -in ca-cert.pem -text -noout | head -20
+        
+        echo "Server certificate information:"
+        openssl x509 -in localhost-cert.pem -text -noout | head -20
+        
+        echo "Certificate verification completed successfully"
+
+    # Add CA certificate to system truststore based on operating system
+    - name: Add CA certificate to system truststore
+      shell: bash
+      working-directory: packages/bruno-tests/ca_certs/certs
+      run: |
+        set -euo pipefail
+        echo "Adding CA certificate to system truststore for linux"
+        
+        # Copy certificate to system trust directory
+        sudo cp ca-cert.pem /usr/local/share/ca-certificates/bruno-ca.crt
+        
+        # Update system certificate bundle
+        sudo update-ca-certificates
+        echo "CA certificate added to Linux truststore"
+        
+        # Verify installation
+        echo "Verifying Linux truststore installation..."
+        if [[ -f "/usr/local/share/ca-certificates/bruno-ca.crt" ]]; then
+          echo "Certificate file successfully installed in truststore"
+          
+          # Test certificate trust verification
+          if openssl verify -CAfile /etc/ssl/certs/ca-certificates.crt ca-cert.pem; then
+            echo "CA certificate is properly trusted by system"
+          else
+            echo "Warning: CA certificate verification failed"
+          fi
+        else
+          echo "Error: Certificate file not found in truststore"
+          exit 1
+        fi
+
+
+    # Verify that the server setup is ready for testing
+    - name: Verify server setup readiness
+      id: verify-setup
+      shell: bash
+      working-directory: packages/bruno-tests/ca_certs
+      run: |
+        set -euo pipefail
+        echo "Verifying server setup readiness..."
+        
+        # Check that server script exists and is readable
+        if [[ ! -f "server.js" ]]; then
+          echo "Error: server.js not found"
+          echo "setup-status=failed" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+        echo "Server script found and accessible"
+        
+        # Verify all required certificates are present
+        REQUIRED_CERTS=("certs/ca-cert.pem" "certs/localhost-cert.pem" "certs/localhost-key.pem")
+        for cert_file in "${REQUIRED_CERTS[@]}"; do
+          if [[ ! -f "$cert_file" ]]; then
+            echo "Error: Required certificate file missing: $cert_file"
+            echo "Available files in certs directory:"
+            ls -la certs/ || echo "certs directory not accessible"
+            echo "setup-status=failed" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+        done
+        echo "All required certificates are present"
+        
+        # start ca certs HTTPS server in background for testing
+        echo "Testing server startup capability..."
+        node server.js > test_server.log 2>&1 &
+        TEST_SERVER_PID=$!
+        echo "started server with PID: $TEST_SERVER_PID"
+
+        # function to check server readiness
+        check_server_ready() {
+          local attempt=$1
+          local max_attempts=$2
+          
+          if RESPONSE=$(curl --connect-timeout 2 --max-time 5 https://localhost:8090 2>/dev/null); then
+            if [[ "$RESPONSE" == "ping" ]]; then
+              echo "Server ready and responding correctly (attempt $attempt/$max_attempts)"
+              return 0
+            else
+              echo "Server responding with unexpected content: '$RESPONSE' (attempt $attempt/$max_attempts)"
+              return 1
+            fi
+          else
+            echo "Server not responding yet (attempt $attempt/$max_attempts)"
+            return 1
+          fi
+        }
+        
+        # Wait for server to become ready
+        echo "Waiting for server to become ready..."
+        MAX_ATTEMPTS=10
+        for ((i=1; i<=MAX_ATTEMPTS; i++)); do
+          if check_server_ready "$i" "$MAX_ATTEMPTS"; then
+            break
+          fi
+          
+          if [[ $i -eq $MAX_ATTEMPTS ]]; then
+            echo "error: server failed to become ready after $MAX_ATTEMPTS attempts"
+            echo "server logs:"
+            cat server.log 2>/dev/null || echo "no server logs available"
+            echo "process status:"
+            if kill -0 "$SERVER_PID" 2>/dev/null; then
+              echo "server process is still running"
+            else
+              echo "server process has died"
+            fi
+            kill "$SERVER_PID" 2>/dev/null || true
+            exit 1
+          fi
+          
+          sleep 2
+        done
+        
+        echo "ca cert server is ready"
+        
+        # Set successful setup status
+        echo "setup-status=ready" >> $GITHUB_OUTPUT

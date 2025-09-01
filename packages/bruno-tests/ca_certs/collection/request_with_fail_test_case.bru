@@ -1,0 +1,36 @@
+meta {
+  name: request_with_fail_test_case
+  type: http
+  seq: 1
+}
+
+get {
+  url: https://localhost:8090
+  body: none
+  auth: inherit
+}
+
+script:pre-request {
+  const runtime = req.getRuntime();
+  if (runtime !== 'quickjs') {
+    req.onFail(function(err) {
+      test('should return ssl verification error', () => {
+        expect(err.code).to.eql('UNABLE_TO_VERIFY_LEAF_SIGNATURE');
+      });
+    });  
+  }
+}
+
+tests {
+  const executionMode = req.getExecutionMode();
+  if (executionMode == 'cli') {
+    test('request should give an tls verification error, should not reach this point.', () => {
+      expect(1).to.eql(2);
+    });  
+  }
+  
+}
+
+settings {
+  encodeUrl: true
+}
