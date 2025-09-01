@@ -27,6 +27,7 @@ const protocolRegex = /^([-+\w]{1,25})(:?\/\/|:)/;
 const { NtlmClient } = require('axios-ntlm');
 const { addDigestInterceptor, getCACertificates } = require('@usebruno/requests');
 const { encodeUrl } = require('@usebruno/common').utils;
+const { executeRequestOnFailHandler, createFailureExecutionContext } = require('./execute-request-on-fail-handler');
 
 const onConsoleLog = (type, args) => {
   console[type](...args);
@@ -79,6 +80,8 @@ const runSingleRequest = async function (
 
     const scriptingConfig = get(brunoConfig, 'scripts', {});
     scriptingConfig.runtime = runtime;
+
+    request.__bruno__runtime = runtime;
 
     // run pre request script
     const requestScriptFile = get(request, 'script.req');
@@ -441,6 +444,37 @@ const runSingleRequest = async function (
         responseTime = response.headers.get('request-duration');
         response.headers.delete('request-duration');
       } else {
+        // Create execution context for onFail handler using the specific utility function
+        const context = createFailureExecutionContext({
+          envVars: envVariables,
+          runtimeVariables,
+          collectionPath,
+          collection,
+          processEnvVars,
+          scriptingConfig,
+          runSingleRequestByPathname,
+          onConsoleLog
+        });
+
+        // Execute the onFail handler if it exists (only for hard errors without response)
+        const failHandlerResult = await executeRequestOnFailHandler(request, err, context);
+        
+        // Update variables from fail handler execution
+        if (failHandlerResult) {
+          if (failHandlerResult.nextRequestName !== undefined) {
+            nextRequestName = failHandlerResult.nextRequestName;
+          }
+          if (failHandlerResult.stopExecution) {
+            shouldStopRunnerExecution = true;
+          }
+          // Merge fail handler test results with pre-request test results
+          if (failHandlerResult.results?.length) {
+            preRequestTestResults = [...preRequestTestResults, ...failHandlerResult.results];
+            // Log fail handler test results
+            logResults(failHandlerResult.results, 'Fail Handler Tests');
+          }
+        }
+
         const errorMessage = err?.message || err?.errors?.map(e => e?.message)?.at(0) || err?.code || 'Request Failed!';
         console.log(chalk.red(stripExtension(relativeItemPathname)) + chalk.dim(` (${errorMessage})`));
         console.log(err);
