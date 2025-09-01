@@ -1,0 +1,168 @@
+name: 'setup server with ca certs for linux os'
+description: 'generate CA certificates, configure system trust, and prepare HTTPS test server'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: install openSSL dependencies
+      shell: bash
+      run: |
+        set -euo pipefail
+        sudo apt-get update -q
+        sudo apt-get install -y openssl
+        echo "openSSL installed on Linux"
+
+    - name: create certificate directories
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        rm -rf e2e-tests/ca_certs/server/certs
+        mkdir -p e2e-tests/ca_certs/server/certs
+
+        echo "certificate directory `certs` created successfully"
+
+    - name: generate CA certificates
+      id: generate-certs
+      shell: bash
+      working-directory: e2e-tests/ca_certs/server
+      run: |
+        set -euo pipefail
+
+        chmod +x generate_certs.sh
+        ./generate_certs.sh
+
+        CA_CERT_PATH="$(pwd)/certs/ca-cert.pem"
+
+        echo "certificates generated successfully at $CA_CERT_PATH"
+
+    - name: verify generated certificates
+      shell: bash
+      working-directory: e2e-tests/ca_certs/server/certs
+      run: |
+        set -euo pipefail
+
+        # Check that all required certificate files exist
+        if [[ ! -f "ca-cert.pem" || ! -f "localhost-cert.pem" || ! -f "localhost-key.pem" ]]; then
+          echo "error: required certificate files are missing"
+          ls -la || true
+          exit 1
+        fi
+        
+        # display certificate information for verification
+        echo "CA certificate information:"
+        openssl x509 -in ca-cert.pem -text -noout | head -20
+        
+        echo "server certificate information:"
+        openssl x509 -in localhost-cert.pem -text -noout | head -20
+        
+        echo "certificate verification completed successfully"
+
+    - name: add CA certificate to system truststore
+      shell: bash
+      working-directory: e2e-tests/ca_certs/server/certs
+      run: |
+        set -euo pipefail
+        echo "adding CA certificate to system truststore for linux"
+        
+        sudo cp ca-cert.pem /usr/local/share/ca-certificates/bruno-ca.crt
+        
+        sudo update-ca-certificates
+        echo "CA certificate added to linux truststore"
+        
+        echo "verifying linux truststore installation"
+        if [[ -f "/usr/local/share/ca-certificates/bruno-ca.crt" ]]; then
+          echo "certificate file successfully installed in truststore"
+          
+          if openssl verify -CAfile /etc/ssl/certs/ca-certificates.crt ca-cert.pem; then
+            echo "CA certificate is properly trusted by system"
+          else
+            echo "warning: CA certificate verification failed"
+          fi
+        else
+          echo "error: certificate file not found in truststore"
+          exit 1
+        fi
+
+    - name: start and verify server
+      id: verify-setup
+      shell: bash
+      working-directory: e2e-tests/ca_certs/server
+      run: |
+        set -euo pipefail
+        echo "verifying server setup readiness"
+        
+        if [[ ! -f "index.js" ]]; then
+          echo "error: server file not found"
+          exit 1
+        fi
+        echo "server script found and accessible"
+        
+        # verify all required certificates are present
+        REQUIRED_CERTS=("certs/ca-cert.pem" "certs/localhost-cert.pem" "certs/localhost-key.pem")
+        for cert_file in "${REQUIRED_CERTS[@]}"; do
+          if [[ ! -f "$cert_file" ]]; then
+            echo "error: required certificate file missing: $cert_file"
+            echo "available files in certs directory:"
+            ls -la certs/ || echo "certs directory not accessible"
+            exit 1
+          fi
+        done
+        echo "all required certificates are present"
+        
+        echo "checking for existing process on port 8090"
+        if lsof -i:8090 > /dev/null 2>&1; then
+          echo "found existing process on port 8090, killing it"
+          sudo kill $(lsof -t -i:8090) || true
+          sleep 2
+        fi
+        
+        echo "starting server"
+        node index.js > test_server.log 2>&1 &
+        TEST_SERVER_PID=$!
+        echo "started server with PID: $TEST_SERVER_PID"
+
+        echo "checking server readiness"
+        check_server_ready() {
+          local attempt=$1
+          local max_attempts=$2
+          
+          if RESPONSE=$(curl --connect-timeout 2 --max-time 5 https://localhost:8090 2>/dev/null); then
+            if [[ "$RESPONSE" == "ping" ]]; then
+              echo "server ready and responding correctly (attempt $attempt/$max_attempts)"
+              return 0
+            else
+              echo "server responding with unexpected content: '$RESPONSE' (attempt $attempt/$max_attempts)"
+              return 1
+            fi
+          else
+            echo "server not responding yet (attempt $attempt/$max_attempts)"
+            return 1
+          fi
+        }
+        
+        echo "waiting for server to become ready"
+        MAX_ATTEMPTS=10
+        for ((i=1; i<=MAX_ATTEMPTS; i++)); do
+          if check_server_ready "$i" "$MAX_ATTEMPTS"; then
+            break
+          fi
+          
+          if [[ $i -eq $MAX_ATTEMPTS ]]; then
+            echo "error: server failed to become ready after $MAX_ATTEMPTS attempts"
+            echo "server logs:"
+            cat server.log 2>/dev/null || echo "no server logs available"
+            echo "process status:"
+            if kill -0 "$SERVER_PID" 2>/dev/null; then
+              echo "server process is still running"
+            else
+              echo "server process has died"
+            fi
+            kill "$SERVER_PID" 2>/dev/null || true
+            exit 1
+          fi
+          
+          sleep 2
+        done
+        
+        echo "ca cert server is ready"
