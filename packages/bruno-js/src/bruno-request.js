@@ -186,6 +186,10 @@ class BrunoRequest {
     return this.req.__bruno__executionMode;
   }
 
+  getRuntime() {
+    return this.req.__bruno__runtime;
+  }
+
   getName() {
     return this.req.name;
   }

@@ -178,6 +178,11 @@ const builder = async (yargs) => {
       type: 'boolean',
       description: 'Stop execution after a failure of a request, test, or assertion'
     })
+    .option('donotbailonerror', {
+      type: 'boolean',
+      description: 'Exit with status code 0 only when there are request errors and no test failures, or assertion failures',
+      default: false
+    })
     .option('reporter-skip-all-headers', {
       type: 'boolean',
       description: 'Omit headers from the reporter output',
@@ -255,7 +260,8 @@ const builder = async (yargs) => {
     .example(
       '$0 run folder --tags=hello,world --exclude-tags=skip',
       'Run only requests with tags "hello" or "world" and exclude any request with tag "skip".'
-    );
+    )
+    .example('$0 run folder --donotbailonerror', 'Run all requests and exit with status code 0 only when there are request errors and no test failures, or assertion failures');
 };
 
 const handler = async function (argv) {
@@ -278,6 +284,7 @@ const handler = async function (argv) {
       sandbox,
       testsOnly,
       bail,
+      donotbailonerror,
       reporterSkipAllHeaders,
       reporterSkipHeaders,
       clientCertConfig,
@@ -667,7 +674,7 @@ const handler = async function (argv) {
       }
     }
 
-    if ((summary.failedAssertions + summary.failedTests + summary.failedPreRequestTests + summary.failedPostResponseTests + summary.failedRequests > 0) || (summary?.errorRequests > 0)) {
+    if ((summary.failedAssertions + summary.failedTests + summary.failedPreRequestTests + summary.failedPostResponseTests + summary.failedRequests > 0) || (summary?.errorRequests > 0 && !donotbailonerror)) {
       process.exit(constants.EXIT_STATUS.ERROR_FAILED_COLLECTION);
     }
   } catch (err) {

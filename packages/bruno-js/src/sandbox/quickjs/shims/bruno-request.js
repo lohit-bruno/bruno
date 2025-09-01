@@ -126,6 +126,12 @@ const addBrunoRequestShimToContext = (vm, req) => {
   vm.setProp(reqObject, 'getExecutionMode', getExecutionMode);
   getExecutionMode.dispose();
 
+  let getRuntime = vm.newFunction('getRuntime', function () {
+    return marshallToVm(req.getRuntime(), vm);
+  });
+  vm.setProp(reqObject, 'getRuntime', getRuntime);
+  getRuntime.dispose();
+
   vm.setProp(vm.global, 'req', reqObject);
   reqObject.dispose();
 };

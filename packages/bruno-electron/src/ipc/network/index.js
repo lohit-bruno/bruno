@@ -541,10 +541,13 @@ const registerNetworkIpc = (mainWindow) => {
 
     const abortController = new AbortController();
     const request = await prepareRequest(item, collection, abortController);
+    request.uid = item.uid;
     request.__bruno__executionMode = 'standalone';
     const brunoConfig = getBrunoConfig(collectionUid);
     const scriptingConfig = get(brunoConfig, 'scripts', {});
-    scriptingConfig.runtime = getJsSandboxRuntime(collection);
+    const runtime = getJsSandboxRuntime(collection);
+    scriptingConfig.runtime = runtime;
+    request.__bruno__runtime = runtime;
 
     try {
       request.signal = abortController.signal;
@@ -656,7 +659,21 @@ const registerNetworkIpc = (mainWindow) => {
           responseTime = response.headers.get('request-duration');
           response.headers.delete('request-duration');
         } else {
-          await executeRequestOnFailHandler(request, error);
+          // Create execution context for onFail handler
+          const context = {
+            requestUid,
+            envVars,
+            collectionPath,
+            collection,
+            collectionUid,
+            runtimeVariables,
+            processEnvVars,
+            scriptingConfig,
+            runRequestByItemPathname,
+            onConsoleLog
+          };
+          
+          await executeRequestOnFailHandler({request, error, context, type: 'run-request-event', mainWindow });
 
           // if it's not a network error, don't continue
           // we are not rejecting the promise here and instead returning a response object with `error` which is handled in the `send-http-request` invocation
@@ -892,7 +909,8 @@ const registerNetworkIpc = (mainWindow) => {
       const cancelTokenUid = uuid();
       const brunoConfig = getBrunoConfig(collectionUid);
       const scriptingConfig = get(brunoConfig, 'scripts', {});
-      scriptingConfig.runtime = getJsSandboxRuntime(collection);
+      const runtime = getJsSandboxRuntime(collection);
+      scriptingConfig.runtime = runtime;
       const envVars = getEnvVars(environment);
       const processEnvVars = getProcessEnvVars(collectionUid);
       let stopRunnerExecution = false;
@@ -1004,6 +1022,7 @@ const registerNetworkIpc = (mainWindow) => {
 
           const request = await prepareRequest(item, collection, abortController);
           request.__bruno__executionMode = 'runner';
+          request.__bruno__runtime = runtime;
           
           const requestUid = uuid();
 
@@ -1199,7 +1218,21 @@ const registerNetworkIpc = (mainWindow) => {
                   ...eventData
                 });
               } else {
-                await executeRequestOnFailHandler(request, error);
+                // Create execution context for onFail handler
+                const context = {
+                  requestUid,
+                  envVars,
+                  collectionPath,
+                  collection,
+                  collectionUid,
+                  runtimeVariables,
+                  processEnvVars,
+                  scriptingConfig,
+                  runRequestByItemPathname,
+                  onConsoleLog
+                };
+                
+                await executeRequestOnFailHandler({request, error, context, type: 'run-folder-event', mainWindow });
 
                 // if it's not a network error, don't continue
                 throw error;
@@ -1469,21 +1502,149 @@ const registerNetworkIpc = (mainWindow) => {
 };
 
 /**
+ * Serializes an error object for safe transmission to script runtime
+ * Only includes safe properties to avoid circular references and sensitive data
+ * Consistent with CLI implementation
+ */
+const serializeErrorForFailureHandler = (error) => {
+  return {
+    message: error.message || 'Unknown error occurred',
+    name: error.name || 'Error',
+    code: error.code,
+    status: error.status,
+    statusText: error.statusText,
+    // Include additional properties that might be useful for debugging
+    errno: error.errno,
+    syscall: error.syscall,
+    hostname: error.hostname,
+    port: error.port
+  };
+};
+
+/**
+ * Creates the onFail handler script wrapper for Electron context
+ * @param {Function} handlerFunction - The original onFail handler function
+ * @param {Object} serializedError - The serialized error object
+ * @returns {string} - The script to execute
+ */
+const createElectronOnFailHandlerScript = (handlerFunction, serializedError) => {
+  return `
+    // Execute the original onFail handler with the error
+    const originalHandler = ${handlerFunction.toString()};
+    const error = ${JSON.stringify(serializedError)};
+    
+    try {
+      await originalHandler(error);
+    } catch (handlerError) {
+      // Rethrow handler errors so they can be caught by the outer try-catch
+      throw new Error('onFail handler execution failed: ' + (handlerError.message || handlerError));
+    }
+  `;
+};
+
+/**
  * Executes the custom error handler if it exists on the request
+ * This is a dedicated failure handler executor, not using the generic runScript function
  * @param {Object} request - The request object that may contain an onFailHandler
  * @param {Error} error - The error that occurred
+ * @param {Object} context - Failure execution context containing necessary parameters
+ * @param {string} context.requestUid - Unique identifier for the request
+ * @param {Object} context.envVars - Environment variables
+ * @param {string} context.collectionPath - Path to the collection
+ * @param {Object} context.collection - Collection object
+ * @param {string} context.collectionUid - Unique identifier for the collection
+ * @param {Object} context.runtimeVariables - Runtime variables
+ * @param {Object} context.processEnvVars - Process environment variables
+ * @param {Object} context.scriptingConfig - Scripting configuration
+ * @param {Function} context.runRequestByItemPathname - Function to run other requests
  */
-const executeRequestOnFailHandler = async (request, error) => {
+const executeRequestOnFailHandler = async ({ request, error, context, type, mainWindow }) => {
   if (!request || typeof request.onFailHandler !== 'function') {
     return;
   }
 
+  const serializedError = serializeErrorForFailureHandler(error);
+  const onFailScript = createElectronOnFailHandlerScript(request.onFailHandler, serializedError);
+
   try {
-    await request.onFailHandler(error);
+    // Create script runtime specifically for failure handler execution
+    const collectionName = context.collection?.name;
+    const scriptRuntime = new ScriptRuntime({ runtime: context.scriptingConfig?.runtime });
+    
+    const scriptResult = await scriptRuntime.runRequestScript(
+      decomment(onFailScript),
+      request,
+      context.envVars || {},
+      context.runtimeVariables || {},
+      context.collectionPath,
+      context.onConsoleLog,
+      context.processEnvVars || {},
+      context.scriptingConfig || {},
+      context.runRequestByItemPathname,
+      collectionName
+    );
+
+    // Send environment and variable updates if any
+    if (scriptResult?.envVariables || scriptResult?.runtimeVariables) {
+      mainWindow.webContents.send('main:script-environment-update', {
+        envVariables: scriptResult.envVariables,
+        runtimeVariables: scriptResult.runtimeVariables,
+        requestUid: context.requestUid,
+        collectionUid: context.collectionUid
+      });
+    }
+
+    // Send persistent environment variable updates if any
+    if (scriptResult?.persistentEnvVariables) {
+      mainWindow.webContents.send('main:persistent-env-variables-update', {
+        persistentEnvVariables: scriptResult.persistentEnvVariables,
+        collectionUid: context.collectionUid
+      });
+    }
+
+    // Send global environment variable updates if any
+    if (scriptResult?.globalEnvironmentVariables) {
+      mainWindow.webContents.send('main:global-environment-variables-update', {
+        globalEnvironmentVariables: scriptResult.globalEnvironmentVariables
+      });
+      context.collection.globalEnvironmentVariables = scriptResult.globalEnvironmentVariables;
+    }
+
+    // Send failure handler test results if available
+    if (scriptResult?.results) {
+      mainWindow.webContents.send(`main:${type}`, {
+        type: 'test-results-pre-request',
+        results: scriptResult.results,
+        itemUid: request.uid || context.requestUid,
+        requestUid: context.requestUid,
+        collectionUid: context.collectionUid
+      });
+    }
+
+    // Update cookies
+    const domainsWithCookies = await getDomainsWithCookies();
+    mainWindow.webContents.send('main:cookies-update', safeParseJSON(safeStringifyJSON(domainsWithCookies)));
+
+    if (scriptResult?.error) {
+      mainWindow.webContents.send('main:display-error', scriptResult.error);
+    }
+
   } catch (handlerError) {
-    console.error('Error executing onFail handler', handlerError);
-    // @TODO: This is a temporary solution to display the error message in the response pane. Revisit and handle properly.
-    error.message = `1. Request failed: ${error.message || 'Error occured while executing the request!'}\n2. Error executing onFail handler: ${handlerError.message || 'Unknown error'}`;
+    console.error('Error executing onFail handler:', handlerError.message || handlerError);
+    
+    // Send failure handler execution error event
+    mainWindow.webContents.send(`main:${type}`, {
+      type: 'on-fail-handler-execution-error',
+      requestUid: context.requestUid,
+      collectionUid: context.collectionUid,
+      itemUid: request.uid || context.requestUid,
+      errorMessage: handlerError.message || 'An error occurred in onFail handler'
+    });
+
+    // Enhance the original error message to include handler error details
+    const originalMessage = error.message || 'Error occurred while executing the request';
+    const handlerMessage = handlerError.message || 'Unknown error in onFail handler';
+    error.message = `1. Request failed: ${originalMessage || 'Error occured while executing the request!'}\n2. Error executing onFail handler: ${handlerMessage}`;
   }
 };
 
