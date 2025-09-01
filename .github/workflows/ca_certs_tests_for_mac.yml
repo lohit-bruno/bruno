@@ -9,7 +9,7 @@ on:
 jobs:
   cli_tests:
     name: cli tests
-    runs-on: self_hosted_macos
+    runs-on: macos-latest
     permissions:
       checks: write
       pull-requests: write
@@ -20,13 +20,12 @@ jobs:
         with:
           node-version: v22.17.0
 
-      - name: Install dependencies
-        run: npm ci --legacy-peer-deps
+      - name: install dependencies
+        run: |
+          npm ci --legacy-peer-deps
+          brew install libxml2
 
-      - name: Install xmllint
-        run: brew install libxml2
-
-      - name: Build Libraries
+      - name: build libraries
         run: |
           npm run build --workspace=packages/bruno-query
           npm run build --workspace=packages/bruno-common
@@ -39,7 +38,7 @@ jobs:
         id: ca-server
         uses: ./.github/actions/server_with_ca_certs/mac
 
-      - name: start the ca certs server and run tests
+      - name: run cli tests
         run: |
           set -euo pipefail
           
@@ -71,20 +70,6 @@ jobs:
           node ../../../packages/bruno-cli/bin/bru.js run ./request_with_fail_test_case.bru --output junit5.xml --cacert ../server/certs/ca-key.pem --ignore-truststore --format junit --donotbailonerror
           xmllint --xpath 'count(//testsuite[@errors="1"])' junit5.xml | grep -q "^1$" || exit 1
 
-      # - name: publish CA certs test report
-      #   uses: EnricoMi/publish-unit-test-result-action@v2
-      #   if: always()
-      #   with:
-      #     check_name: CA certs test results
-      #     files: |
-      #       packages/bruno-tests/ca_certs/collection/junit1.xml
-      #       packages/bruno-tests/ca_certs/collection/junit2.xml
-      #       packages/bruno-tests/ca_certs/collection/junit3.xml
-      #       packages/bruno-tests/ca_certs/collection/junit4.xml
-      #       packages/bruno-tests/ca_certs/collection/junit5.xml
-      #     comment_mode: always
-
-
   e2e_tests:
     name: e2e tests
     timeout-minutes: 60
@@ -94,11 +79,12 @@ jobs:
     - uses: actions/setup-node@v4
       with:
         node-version: v22.17.0
-    - name: Install dependencies
+    
+    - name: install dependencies
       run: |
         npm ci --legacy-peer-deps
 
-    - name: Build Libraries
+    - name: build libraries
       run: |
         npm run build:graphql-docs
         npm run build:bruno-query
@@ -112,15 +98,15 @@ jobs:
       id: ca-server
       uses: ./.github/actions/server_with_ca_certs/mac
 
-    - name: run tests
+    - name: run e2e tests
       run: |
         set -euo pipefail
 
         npm run test:e2e ca_certs
 
-    # - uses: actions/upload-artifact@v4
-    #   if: ${{ !cancelled() }}
-    #   with:
-    #     name: playwright-report-macos
-    #     path: playwright-report/
-    #     retention-days: 30
+    - uses: actions/upload-artifact@v4
+      if: ${{ !cancelled() }}
+      with:
+        name: playwright-report-macos
+        path: playwright-report/
+        retention-days: 30
