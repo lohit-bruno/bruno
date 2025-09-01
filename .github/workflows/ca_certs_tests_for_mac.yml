@@ -51,27 +51,28 @@ jobs:
           # navigate to CA certificates test collection directory
           cd e2e-tests/ca_certs/collection
 
-          # with ssl/tls disabled
+          echo "with ssl/tls disabled"
           # should pass
           node ../../../packages/bruno-cli/bin/bru.js run ./request.bru --output junit1.xml --insecure --format junit
           xmllint --xpath 'count(//testsuite[@errors="0"])' junit1.xml | grep -q "^1$" || exit 1
 
-          # with default/sytem ca certs
+          echo "with default/sytem ca certs"
           # should pass
           node ../../../packages/bruno-cli/bin/bru.js run ./request.bru --output junit2.xml --format junit
           xmllint --xpath 'count(//testsuite[@errors="0"])' junit2.xml | grep -q "^1$" || exit 1
 
-          # with only VALID custom ca cert and NO default/system ca certs
+          echo "with only VALID custom ca cert and NO default/system ca certs"
           # should pass
           node ../../../packages/bruno-cli/bin/bru.js run ./request.bru --output junit3.xml --cacert ../server/certs/ca-cert.pem --ignore-truststore --format junit
           xmllint --xpath 'count(//testsuite[@errors="0"])' junit3.xml | grep -q "^1$" || exit 1
 
-          # with INVALID custom ca cert and default/system ca certs
+          echo "with INVALID custom ca cert and default/system ca certs"
           # should pass
           node ../../../packages/bruno-cli/bin/bru.js run ./request.bru --output junit4.xml --cacert ../server/certs/ca-cert.key --format junit
           xmllint --xpath 'count(//testsuite[@errors="0"])' junit4.xml | grep -q "^1$" || exit 1
 
-          # with INVALID custom ca cert and NO default/system ca certs
+          echo "with INVALID custom ca cert and NO default/system ca certs"
+          echo "request will error but the pre-request test should pass"
           # should fail
           node ../../../packages/bruno-cli/bin/bru.js run ./request_with_fail_test_case.bru --output junit5.xml --cacert ../server/certs/ca-key.pem --ignore-truststore --format junit --donotbailonerror
           xmllint --xpath 'count(//testsuite[@errors="1"])' junit5.xml | grep -q "^1$" || exit 1
