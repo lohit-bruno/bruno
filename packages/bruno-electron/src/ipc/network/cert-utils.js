@@ -26,49 +26,15 @@ const getCertsAndProxyConfig = async ({
     httpsAgentRequestFields['rejectUnauthorized'] = false;
   }
 
-  // CA certificate configuration
-  try {
-    let caCertificates = [];
-    
-    // handle user-provided custom CA certificate file with optional default certificates
-    if (preferencesUtil.shouldUseCustomCaCertificate()) {
-      const caCertFilePath = preferencesUtil.getCustomCaCertificateFilePath();
-      
-      // validate custom CA certificate file
-      if (caCertFilePath && fs.existsSync(caCertFilePath)) {
-        try {
-          const customCert = fs.readFileSync(caCertFilePath, 'utf8');
-          if (customCert && customCert.trim()) {
-            caCertificates.push(customCert.trim());
-          }
-        } catch (err) {
-          console.error(`Failed to read custom CA certificate from ${caCertFilePath}:`, err.message);
-          throw new Error(`Unable to load custom CA certificate: ${err.message}`);
-        }
-      }
-      
-      // optionally augment custom CA with default certificates
-      if (preferencesUtil.shouldKeepDefaultCaCertificates()) {
-        const defaultCertificates = getCACertificates(['bundled', 'system', 'extra']);
-        if (defaultCertificates.length > 0) {
-          caCertificates.push(...defaultCertificates);
-        }
-      }
-    } else {
-      // use default CA certificates when no custom configuration is specified
-      const defaultCertificates = getCACertificates(['bundled', 'system', 'extra']);
-      if (defaultCertificates.length > 0) {
-        caCertificates.push(...defaultCertificates);
-      }
-    }
+  let caCertFilePath = preferencesUtil.shouldUseCustomCaCertificate() && preferencesUtil.getCustomCaCertificateFilePath();
+  let caCertificates = getCACertificates({ 
+    caCertFilePath, 
+    shouldKeepDefaultCerts: preferencesUtil.shouldKeepDefaultCaCertificates() 
+  });
 
-    // configure HTTPS agent with aggregated CA certificates
-    if (caCertificates.length > 0) {
-      httpsAgentRequestFields['ca'] = caCertificates;
-    }
-  } catch (err) {
-    console.error('Error configuring CA certificates:', err.message);
-    throw err; // Re-throw certificate loading errors as they're critical
+  // configure HTTPS agent with aggregated CA certificates
+  if (caCertificates?.length > 0) {
+    httpsAgentRequestFields['ca'] = caCertificates;
   }
 
   const brunoConfig = getBrunoConfig(collectionUid);

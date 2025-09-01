@@ -25,9 +25,8 @@ const { createFormData } = require('../utils/form-data');
 const { getOAuth2Token } = require('./oauth2');
 const protocolRegex = /^([-+\w]{1,25})(:?\/\/|:)/;
 const { NtlmClient } = require('axios-ntlm');
-const { addDigestInterceptor } = require('@usebruno/requests');
+const { addDigestInterceptor, getCACertificates } = require('@usebruno/requests');
 const { encodeUrl } = require('@usebruno/common').utils;
-const { getCACertificates } = require('../utils/ca-cert');
 
 const onConsoleLog = (type, args) => {
   console[type](...args);
@@ -156,8 +155,10 @@ const runSingleRequest = async function (
     if (insecure) {
       httpsAgentRequestFields['rejectUnauthorized'] = false;
     } else {
-      let caCertificates = getCACertificates(options);
-      if (caCertificates && caCertificates.length > 0) {
+      const caCertArray = [options['cacert'], process.env.SSL_CERT_FILE];
+      const caCertFilePath = caCertArray.find((el) => el);
+      let caCertificates = getCACertificates({ caCertFilePath, shouldKeepDefaultCerts: !options['ignoreTruststore'] });
+      if (caCertificates?.length > 0) {
         httpsAgentRequestFields['ca'] = caCertificates;
       }
     }
@@ -440,7 +441,9 @@ const runSingleRequest = async function (
         responseTime = response.headers.get('request-duration');
         response.headers.delete('request-duration');
       } else {
-        console.log(chalk.red(stripExtension(relativeItemPathname)) + chalk.dim(` (${err.message})`));
+        const errorMessage = err?.message || err?.errors?.map(e => e?.message)?.at(0) || err?.code || 'Request Failed!';
+        console.log(chalk.red(stripExtension(relativeItemPathname)) + chalk.dim(` (${errorMessage})`));
+        console.log(err);
         return {
           test: {
             filename: relativeItemPathname
@@ -459,7 +462,7 @@ const runSingleRequest = async function (
             url: null,
             responseTime: 0
           },
-          error: err?.message || err?.errors?.map(e => e?.message)?.at(0) || err?.code || 'Request Failed!',
+          error: errorMessage,
           status: 'error',
           assertionResults: [],
           testResults: [],
