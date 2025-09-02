@@ -1,0 +1,20 @@
+name: wsl test
+
+on: workflow_dispatch
+
+jobs:
+  quick-wsl-test:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: Vampire/setup-wsl@v3
+      with:
+        distribution: Ubuntu-22.04
+    - name: Test WSL
+      shell: wsl-bash {0}
+      run: |
+        echo "✓ WSL working!"
+        uname -a
+        pwd
+        echo "Test file" > test.txt && cat test.txt && rm test.txt
+        echo "✓ All basic tests passed!"
