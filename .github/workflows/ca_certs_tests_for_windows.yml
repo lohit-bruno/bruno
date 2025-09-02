@@ -31,11 +31,11 @@ jobs:
           # Install PowerShell Core using winget (available on GitHub Actions runners)
           winget install --id Microsoft.Powershell --source winget --accept-package-agreements --accept-source-agreements
           
-          # Add PowerShell Core to PATH for current session
+          # Add PowerShell Core to PATH persistently for all subsequent steps
           $pwshPath = "${env:ProgramFiles}\PowerShell\7"
           if (Test-Path $pwshPath) {
-            $env:PATH = "$pwshPath;$env:PATH"
-            Write-Output "PowerShell Core installed and added to PATH"
+            echo "$pwshPath" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+            Write-Output "PowerShell Core installed and added to GitHub PATH"
           } else {
             Write-Output "Error: PowerShell Core installation failed"
             exit 1
@@ -111,11 +111,11 @@ jobs:
         # Install PowerShell Core using winget (available on GitHub Actions runners)
         winget install --id Microsoft.Powershell --source winget --accept-package-agreements --accept-source-agreements
         
-        # Add PowerShell Core to PATH for current session
+        # Add PowerShell Core to PATH persistently for all subsequent steps
         $pwshPath = "${env:ProgramFiles}\PowerShell\7"
         if (Test-Path $pwshPath) {
-          $env:PATH = "$pwshPath;$env:PATH"
-          Write-Output "PowerShell Core installed and added to PATH"
+          echo "$pwshPath" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          Write-Output "PowerShell Core installed and added to GitHub PATH"
         } else {
           Write-Output "Error: PowerShell Core installation failed"
           exit 1
