@@ -207,7 +207,6 @@ foreach ($file in $tempFiles) {
 Write-Host ""
 Write-Host "Certificate generation completed successfully!" -ForegroundColor Green
 Write-Host "============================================="
-Write-Host "Generated files in $CERTS_DIR:" -ForegroundColor Cyan
 Write-Host "  ca-cert.pem        - Root CA certificate (PEM format)" -ForegroundColor White
 Write-Host "  ca-cert.cer        - Root CA certificate (DER format for Windows)" -ForegroundColor White
 Write-Host "  ca-key.pem         - Root CA private key" -ForegroundColor White
