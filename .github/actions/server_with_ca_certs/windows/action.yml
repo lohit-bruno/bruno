@@ -1,0 +1,186 @@
+name: 'setup server with ca certs for windows os'
+description: 'generate CA certificates, configure Windows system trust, and prepare HTTPS test server'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: install openSSL dependencies
+      shell: bash
+      run: |
+        set -euo pipefail
+        
+        # Check if OpenSSL is available in Git Bash (comes with Git for Windows)
+        if command -v openssl &> /dev/null; then
+          echo "OpenSSL found: $(openssl version)"
+        else
+          echo "ERROR: OpenSSL not found in Git Bash PATH"
+          echo "Please ensure Git for Windows is properly installed"
+          exit 1
+        fi
+        
+        echo "OpenSSL verified for Windows"
+
+    - name: create certificate directories
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        rm -rf e2e-tests/ca_certs/server/certs
+        mkdir -p e2e-tests/ca_certs/server/certs
+
+        echo "certificate directory `certs` created successfully"
+
+    - name: generate CA certificates
+      id: generate-certs
+      shell: bash
+      working-directory: e2e-tests/ca_certs/server
+      run: |
+        set -euo pipefail
+
+        chmod +x generate_certs_windows.sh
+        ./generate_certs_windows.sh
+
+        CA_CERT_PATH="$(pwd)/certs/ca-cert.pem"
+        CA_CERT_DER_PATH="$(pwd)/certs/ca-cert.cer"
+
+        echo "certificates generated successfully at $CA_CERT_PATH"
+        echo "Windows DER certificate at $CA_CERT_DER_PATH"
+
+    - name: verify generated certificates
+      shell: bash
+      working-directory: e2e-tests/ca_certs/server/certs
+      run: |
+        set -euo pipefail
+
+        # Check that all required certificate files exist (Windows generates additional formats)
+        if [[ ! -f "ca-cert.pem" || ! -f "ca-cert.cer" || ! -f "localhost-cert.pem" || ! -f "localhost-key.pem" || ! -f "localhost.p12" ]]; then
+          echo "error: required certificate files are missing"
+          ls -la || true
+          exit 1
+        fi
+        
+        # display certificate information for verification
+        echo "CA certificate information:"
+        openssl x509 -in ca-cert.pem -text -noout | head -20
+        
+        echo "server certificate information:"
+        openssl x509 -in localhost-cert.pem -text -noout | head -20
+        
+        echo "certificate verification completed successfully"
+
+    - name: add CA certificate to Windows truststore
+      shell: powershell
+      working-directory: e2e-tests/ca_certs/server/certs
+      run: |
+        $ErrorActionPreference = "Stop"
+        Write-Output "Adding CA certificate to Windows truststore"
+        
+        # Import CA certificate to Trusted Root Certification Authorities store
+        $certPath = "$PWD\ca-cert.cer"
+        Write-Output "Certificate path: $certPath"
+        
+        if (Test-Path $certPath) {
+          Import-Certificate -FilePath $certPath -CertStoreLocation Cert:\LocalMachine\Root
+          Write-Output "CA certificate added to Windows truststore successfully"
+          
+          # Verify the certificate was installed
+          $cert = Get-ChildItem -Path Cert:\LocalMachine\Root | Where-Object { $_.Subject -like "*Local Dev CA*" }
+          if ($cert) {
+            Write-Output "Certificate verification: CA certificate found in Windows truststore"
+            Write-Output "Subject: $($cert.Subject)"
+          } else {
+            Write-Output "Warning: CA certificate not found in truststore after installation"
+          }
+        } else {
+          Write-Output "Error: Certificate file not found at $certPath"
+          exit 1
+        }
+
+    - name: start and verify server
+      id: verify-setup
+      shell: bash
+      working-directory: e2e-tests/ca_certs/server
+      run: |
+        set -euo pipefail
+        echo "verifying server setup readiness"
+        
+        if [[ ! -f "index.js" ]]; then
+          echo "error: server file not found"
+          exit 1
+        fi
+        echo "server script found and accessible"
+        
+        # verify all required certificates are present (Windows needs p12 bundle)
+        REQUIRED_CERTS=("certs/ca-cert.pem" "certs/ca-cert.cer" "certs/localhost-cert.pem" "certs/localhost-key.pem" "certs/localhost.p12")
+        for cert_file in "${REQUIRED_CERTS[@]}"; do
+          if [[ ! -f "$cert_file" ]]; then
+            echo "error: required certificate file missing: $cert_file"
+            echo "available files in certs directory:"
+            ls -la certs/ || echo "certs directory not accessible"
+            exit 1
+          fi
+        done
+        echo "all required certificates are present for Windows"
+        
+        echo "checking for existing process on port 8090"
+        # Use netstat for Windows compatibility (works in Git Bash)
+        if netstat -an | grep -q ":8090"; then
+          echo "found existing process on port 8090, attempting to kill it"
+          # Try to find and kill the process using taskkill
+          for pid in $(netstat -ano | grep ":8090" | awk '{print $5}' | sort -u); do
+            if [[ "$pid" =~ ^[0-9]+$ ]]; then
+              taskkill //PID $pid //F 2>/dev/null || echo "failed to kill PID $pid"
+            fi
+          done
+          sleep 2
+        fi
+        
+        echo "starting server"
+        node index.js > test_server.log 2>&1 &
+        TEST_SERVER_PID=$!
+        echo "started server with PID: $TEST_SERVER_PID"
+
+        echo "checking server readiness"
+        check_server_ready() {
+          local attempt=$1
+          local max_attempts=$2
+          
+          if RESPONSE=$(curl --connect-timeout 2 --max-time 5 https://localhost:8090 2>/dev/null); then
+            if [[ "$RESPONSE" == "ping" ]]; then
+              echo "server ready and responding correctly (attempt $attempt/$max_attempts)"
+              return 0
+            else
+              echo "server responding with unexpected content: '$RESPONSE' (attempt $attempt/$max_attempts)"
+              return 1
+            fi
+          else
+            echo "server not responding yet (attempt $attempt/$max_attempts)"
+            return 1
+          fi
+        }
+        
+        echo "waiting for server to become ready"
+        MAX_ATTEMPTS=10
+        for ((i=1; i<=MAX_ATTEMPTS; i++)); do
+          if check_server_ready "$i" "$MAX_ATTEMPTS"; then
+            break
+          fi
+          
+          if [[ $i -eq $MAX_ATTEMPTS ]]; then
+            echo "error: server failed to become ready after $MAX_ATTEMPTS attempts"
+            echo "server logs:"
+            cat test_server.log 2>/dev/null || echo "no server logs available"
+            echo "process status:"
+            if kill -0 "$TEST_SERVER_PID" 2>/dev/null; then
+              echo "server process is still running"
+            else
+              echo "server process has died"
+            fi
+            kill "$TEST_SERVER_PID" 2>/dev/null || true
+            exit 1
+          fi
+          
+          sleep 2
+        done
+        
+        echo "Windows CA cert server is ready and accessible"

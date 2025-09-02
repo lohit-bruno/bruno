@@ -1,5 +1,5 @@
 import * as fs from 'node:fs';
-import { execSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 
 type T_CACertSource = 'bundled' | 'system' | 'extra'
 
@@ -18,12 +18,18 @@ const safeTlsGetCACertificates = (certType: T_CACertSource): string[] => {
         console.log('[]');
       }
     `;
-    
-    const output = execSync(`node -e "${script.replace(/"/g, '\\"')}"`, {
+
+    const result = spawnSync('node', ['-e', script], {
       encoding: 'utf8',
       timeout: 5000, // 5 second timeout
       stdio: 'pipe'
-    }).trim();
+    });
+    
+    if (result.error || result.status !== 0) {
+      return [];
+    }
+    
+    const output = result.stdout.trim();
     
     return JSON.parse(output);
   } catch (error) {
@@ -81,8 +87,8 @@ const getCACertificates = ({ caCertFilePath, shouldKeepDefaultCerts = true }: { 
             caCertificates.push(customCert.trim());
           }
         } catch (err) {
-          console.error(`Failed to read custom CA certificate from ${caCertFilePath}:`, err.message);
-          throw new Error(`Unable to load custom CA certificate: ${err.message}`);
+          console.error(`Failed to read custom CA certificate from ${caCertFilePath}:`, (err as Error).message);
+          throw new Error(`Unable to load custom CA certificate: ${(err as Error).message}`);
         }
       }
 
@@ -103,7 +109,7 @@ const getCACertificates = ({ caCertFilePath, shouldKeepDefaultCerts = true }: { 
 
     return caCertificates;
   } catch (err) {
-    console.error('Error configuring CA certificates:', err.message);
+    console.error('Error configuring CA certificates:', (err as Error).message);
     throw err; // Re-throw certificate loading errors as they're critical
   }
 }

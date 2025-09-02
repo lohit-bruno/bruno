@@ -2,10 +2,16 @@ const https = require('node:https');
 const fs = require('node:fs');
 const path = require('node:path');
 
-var serverOptions = {
-  key: fs.readFileSync(path.join(__dirname, './certs/localhost-key.pem')),
-  cert: fs.readFileSync(path.join(__dirname, './certs/localhost-cert.pem'))
-};
+var serverOptions = process.platform === 'win32' 
+  ? {
+      // Windows: Use PKCS#12 bundle
+      pfx: fs.readFileSync(path.join(__dirname, './certs/localhost.p12'))
+    }
+  : {
+      // Unix/Linux/macOS: Use PEM files
+      key: fs.readFileSync(path.join(__dirname, './certs/localhost-key.pem')),
+      cert: fs.readFileSync(path.join(__dirname, './certs/localhost-cert.pem'))
+    };
 
 (async () => {
   https.createServer(serverOptions, function (req, res) {

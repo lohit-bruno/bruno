@@ -1,0 +1,106 @@
+name: CA certs tests for windows os
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: 'runner for both cli and e2e tests'
+        required: false
+        default: 'windows-latest'
+        type: string
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  cli_tests:
+    name: cli tests
+    runs-on: ${{ inputs.runner || 'windows-latest' }}
+    permissions:
+      checks: write
+      pull-requests: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: v22.17.0
+
+      - name: install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: build libraries
+        run: |
+          npm run build --workspace=packages/bruno-query
+          npm run build --workspace=packages/bruno-common
+          npm run sandbox:bundle-libraries --workspace=packages/bruno-js
+          npm run build --workspace=packages/bruno-converters
+          npm run build --workspace=packages/bruno-requests
+          npm run build --workspace=packages/bruno-filestore
+
+      - name: setup CA certificates and start the ca certs server
+        id: ca-server
+        uses: ./.github/actions/server_with_ca_certs/windows
+
+      - name: run cli tests
+        shell: cmd
+        run: |
+          cd e2e-tests\ca_certs\collection
+
+          echo "with ssl/tls disabled"
+          node ..\..\..\packages\bruno-cli\bin\bru.js run .\request.bru --output junit1.xml --insecure --format junit
+          findstr /c:"errors=\"0\"" junit1.xml > nul || exit 1
+
+          echo "with default/sytem ca certs"
+          node ..\..\..\packages\bruno-cli\bin\bru.js run .\request.bru --output junit2.xml --format junit
+          findstr /c:"errors=\"0\"" junit2.xml > nul || exit 1
+
+          echo "with only VALID custom ca cert and NO default/system ca certs"
+          node ..\..\..\packages\bruno-cli\bin\bru.js run .\request.bru --output junit3.xml --cacert ..\server\certs\ca-cert.pem --ignore-truststore --format junit
+          findstr /c:"errors=\"0\"" junit3.xml > nul || exit 1
+
+          echo "with INVALID custom ca cert and default/system ca certs"
+          node ..\..\..\packages\bruno-cli\bin\bru.js run .\request.bru --output junit4.xml --cacert ..\server\certs\ca-cert.key --format junit
+          findstr /c:"errors=\"0\"" junit4.xml > nul || exit 1
+
+          echo "with INVALID custom ca cert and NO default/system ca certs"
+          echo "request will error but the pre-request test should pass"
+          node ..\..\..\packages\bruno-cli\bin\bru.js run .\request_with_fail_test_case.bru --output junit5.xml --cacert ..\server\certs\ca-key.pem --ignore-truststore --format junit --donotbailonerror
+          findstr /c:"errors=\"1\"" junit5.xml > nul || exit 1
+
+  e2e_tests:
+    name: e2e tests
+    timeout-minutes: 60
+    runs-on: ${{ inputs.runner || 'windows-latest' }}
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: v22.17.0
+    
+    - name: install dependencies
+      run: npm ci --legacy-peer-deps
+
+    - name: build libraries
+      run: |
+        npm run build:graphql-docs
+        npm run build:bruno-query
+        npm run build:bruno-common
+        npm run sandbox:bundle-libraries --workspace=packages/bruno-js
+        npm run build:bruno-converters
+        npm run build:bruno-requests
+        npm run build:bruno-filestore
+
+    - name: setup CA certificates and start the ca certs server
+      id: ca-server
+      uses: ./.github/actions/server_with_ca_certs/windows
+
+    - name: run e2e tests
+      run: npm run test:e2e ca_certs
+
+    - uses: actions/upload-artifact@v4
+      if: ${{ !cancelled() }}
+      with:
+        name: playwright-report-windows
+        path: playwright-report/
+        retention-days: 30
