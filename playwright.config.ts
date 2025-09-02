@@ -1,4 +1,4 @@
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig } from '@playwright/test';
 
 const reporter: any[] = [['list'], ['html']];
 
@@ -6,18 +6,7 @@ if (process.env.CI) {
   reporter.push(['github']);
 }
 
-const testsToIgnore = [
-  'ca_certs/**' // CA certificate tests require separate server setup and certificate generation
-];
-
-// remove test paths from the ignore list if they are explicitly specified in CLI arguments
-// example: when running `npm run test:e2e ca_certs`, remove 'ca_certs/**' from ignore list
-const filteredTestsToIgnore = testsToIgnore.filter(testPath => 
-  process.argv.some(arg => arg.startsWith(testPath.replace(/\*/g, '')))
-);
-
 export default defineConfig({
-  testDir: './e2e-tests',
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
@@ -28,11 +17,17 @@ export default defineConfig({
     trace: process.env.CI ? 'on-first-retry' : 'on'
   },
 
-  testIgnore: filteredTestsToIgnore,
-
   projects: [
     {
-      name: 'Bruno Electron App'
+      name: 'default',
+      testDir: './e2e-tests',
+      testIgnore: [
+        'ca_certs/**' // CA certificate tests require separate server setup and certificate generation
+      ]
+    },
+    {
+      name: 'ca_certs',
+      testDir: './e2e-tests/ca_certs'
     }
   ],
 
