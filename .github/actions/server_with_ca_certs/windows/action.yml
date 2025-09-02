@@ -4,6 +4,26 @@ description: 'generate CA certificates, configure Windows system trust, and prep
 runs:
   using: 'composite'
   steps:
+    - name: setup Git Bash environment
+      shell: powershell
+      run: |
+        $ErrorActionPreference = "Stop"
+        # Ensure Git is in PATH for bash operations
+        $gitPath = (Get-Command git -ErrorAction SilentlyContinue).Source
+        if ($gitPath) {
+          $gitDir = Split-Path (Split-Path $gitPath -Parent) -Parent
+          $bashPath = Join-Path $gitDir "bin\bash.exe"
+          Write-Output "Git Bash found at: $bashPath"
+          if (Test-Path $bashPath) {
+            Write-Output "Git Bash is available for shell operations"
+          } else {
+            Write-Output "Warning: Git Bash executable not found"
+          }
+        } else {
+          Write-Output "ERROR: Git not found in PATH"
+          exit 1
+        }
+        Write-Output "Git Bash environment verified"
     - name: install openSSL dependencies
       shell: bash
       run: |
