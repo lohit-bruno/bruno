@@ -4,92 +4,100 @@ description: 'generate CA certificates, configure Windows system trust, and prep
 runs:
   using: 'composite'
   steps:
-    - name: setup Git Bash environment
-      shell: powershell
+    - name: install and verify OpenSSL
+      shell: pwsh
       run: |
         $ErrorActionPreference = "Stop"
-        # Ensure Git is in PATH for bash operations
-        $gitPath = (Get-Command git -ErrorAction SilentlyContinue).Source
-        if ($gitPath) {
-          $gitDir = Split-Path (Split-Path $gitPath -Parent) -Parent
-          $bashPath = Join-Path $gitDir "bin\bash.exe"
-          Write-Output "Git Bash found at: $bashPath"
-          if (Test-Path $bashPath) {
-            Write-Output "Git Bash is available for shell operations"
-          } else {
-            Write-Output "Warning: Git Bash executable not found"
-          }
-        } else {
-          Write-Output "ERROR: Git not found in PATH"
+        Write-Output "Installing OpenSSL with Chocolatey..."
+        
+        # Install Chocolatey if not present
+        if (-not (Get-Command choco -ErrorAction SilentlyContinue)) {
+          Set-ExecutionPolicy Bypass -Scope Process -Force
+          [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+          iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+        }
+        
+        # Install OpenSSL
+        choco install openssl -y
+        refreshenv
+        
+        # Update PATH for current session
+        $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "User")
+        
+        # Verify OpenSSL installation
+        try {
+          $opensslVersion = & openssl version 2>&1
+          Write-Output "OpenSSL found: $opensslVersion"
+        } catch {
+          Write-Output "ERROR: OpenSSL not found in PATH after installation"
+          Write-Output "Please ensure OpenSSL is properly installed"
           exit 1
         }
-        Write-Output "Git Bash environment verified"
-    - name: verify OpenSSL availability
-      shell: msys2 {0}
-      run: |
-        set -euo pipefail
         
-        # Check if OpenSSL is available in MSYS2 environment
-        if command -v openssl &> /dev/null; then
-          echo "OpenSSL found: $(openssl version)"
-        else
-          echo "ERROR: OpenSSL not found in MSYS2 PATH"
-          echo "Please ensure MSYS2 is properly set up with OpenSSL"
-          exit 1
-        fi
-        
-        echo "OpenSSL verified for Windows"
+        Write-Output "OpenSSL verified for Windows"
 
     - name: create certificate directories
-      shell: msys2 {0}
+      shell: pwsh
       run: |
-        set -euo pipefail
+        $ErrorActionPreference = "Stop"
 
-        rm -rf e2e-tests/ca_certs/server/certs
-        mkdir -p e2e-tests/ca_certs/server/certs
+        if (Test-Path "e2e-tests/ca_certs/server/certs") {
+          Remove-Item -Recurse -Force "e2e-tests/ca_certs/server/certs"
+        }
+        New-Item -ItemType Directory -Path "e2e-tests/ca_certs/server/certs" -Force
 
-        echo "certificate directory `certs` created successfully"
+        Write-Output "certificate directory 'certs' created successfully"
 
     - name: generate CA certificates
       id: generate-certs
-      shell: msys2 {0}
+      shell: pwsh
       working-directory: e2e-tests/ca_certs/server
       run: |
-        set -euo pipefail
+        $ErrorActionPreference = "Stop"
 
-        chmod +x generate_certs_windows.sh
-        ./generate_certs_windows.sh
+        # Update PATH to ensure OpenSSL is available
+        $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "User")
 
-        CA_CERT_PATH="$(pwd)/certs/ca-cert.pem"
-        CA_CERT_DER_PATH="$(pwd)/certs/ca-cert.cer"
+        .\generate_certs_windows.ps1
 
-        echo "certificates generated successfully at $CA_CERT_PATH"
-        echo "Windows DER certificate at $CA_CERT_DER_PATH"
+        $CA_CERT_PATH = "$(Get-Location)/certs/ca-cert.pem"
+        $CA_CERT_DER_PATH = "$(Get-Location)/certs/ca-cert.cer"
+
+        Write-Output "certificates generated successfully at $CA_CERT_PATH"
+        Write-Output "Windows DER certificate at $CA_CERT_DER_PATH"
 
     - name: verify generated certificates
-      shell: msys2 {0}
+      shell: pwsh
       working-directory: e2e-tests/ca_certs/server/certs
       run: |
-        set -euo pipefail
+        $ErrorActionPreference = "Stop"
+
+        # Update PATH to ensure OpenSSL is available
+        $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "User")
 
         # Check that all required certificate files exist (Windows generates additional formats)
-        if [[ ! -f "ca-cert.pem" || ! -f "ca-cert.cer" || ! -f "localhost-cert.pem" || ! -f "localhost-key.pem" || ! -f "localhost.p12" ]]; then
-          echo "error: required certificate files are missing"
-          ls -la || true
-          exit 1
-        fi
+        $requiredFiles = @("ca-cert.pem", "ca-cert.cer", "localhost-cert.pem", "localhost-key.pem", "localhost.p12")
+        foreach ($file in $requiredFiles) {
+          if (-not (Test-Path $file)) {
+            Write-Output "error: required certificate file missing: $file"
+            Get-ChildItem -Force | Format-Table -AutoSize
+            exit 1
+          }
+        }
         
         # display certificate information for verification
-        echo "CA certificate information:"
-        openssl x509 -in ca-cert.pem -text -noout | head -20
+        Write-Output "CA certificate information:"
+        $caCertInfo = & openssl x509 -in ca-cert.pem -text -noout 2>&1
+        $caCertInfo | Select-Object -First 20
         
-        echo "server certificate information:"
-        openssl x509 -in localhost-cert.pem -text -noout | head -20
+        Write-Output "server certificate information:"
+        $serverCertInfo = & openssl x509 -in localhost-cert.pem -text -noout 2>&1
+        $serverCertInfo | Select-Object -First 20
         
-        echo "certificate verification completed successfully"
+        Write-Output "certificate verification completed successfully"
 
     - name: add CA certificate to Windows truststore
-      shell: powershell
+      shell: pwsh
       working-directory: e2e-tests/ca_certs/server/certs
       run: |
         $ErrorActionPreference = "Stop"
@@ -118,89 +126,106 @@ runs:
 
     - name: start and verify server
       id: verify-setup
-      shell: msys2 {0}
+      shell: pwsh
       working-directory: e2e-tests/ca_certs/server
       run: |
-        set -euo pipefail
-        echo "verifying server setup readiness"
+        $ErrorActionPreference = "Stop"
+        Write-Output "verifying server setup readiness"
         
-        if [[ ! -f "index.js" ]]; then
-          echo "error: server file not found"
+        if (-not (Test-Path "index.js")) {
+          Write-Output "error: server file not found"
           exit 1
-        fi
-        echo "server script found and accessible"
+        }
+        Write-Output "server script found and accessible"
         
         # verify all required certificates are present (Windows needs p12 bundle)
-        REQUIRED_CERTS=("certs/ca-cert.pem" "certs/ca-cert.cer" "certs/localhost-cert.pem" "certs/localhost-key.pem" "certs/localhost.p12")
-        for cert_file in "${REQUIRED_CERTS[@]}"; do
-          if [[ ! -f "$cert_file" ]]; then
-            echo "error: required certificate file missing: $cert_file"
-            echo "available files in certs directory:"
-            ls -la certs/ || echo "certs directory not accessible"
+        $requiredCerts = @("certs/ca-cert.pem", "certs/ca-cert.cer", "certs/localhost-cert.pem", "certs/localhost-key.pem", "certs/localhost.p12")
+        foreach ($certFile in $requiredCerts) {
+          if (-not (Test-Path $certFile)) {
+            Write-Output "error: required certificate file missing: $certFile"
+            Write-Output "available files in certs directory:"
+            try {
+              Get-ChildItem certs/ | Format-Table -AutoSize
+            } catch {
+              Write-Output "certs directory not accessible"
+            }
             exit 1
-          fi
-        done
-        echo "all required certificates are present for Windows"
+          }
+        }
+        Write-Output "all required certificates are present for Windows"
         
-        echo "checking for existing process on port 8090"
-        # Use netstat for Windows compatibility (works in Git Bash)
-        if netstat -an | grep -q ":8090"; then
-          echo "found existing process on port 8090, attempting to kill it"
-          # Try to find and kill the process using taskkill
-          for pid in $(netstat -ano | grep ":8090" | awk '{print $5}' | sort -u); do
-            if [[ "$pid" =~ ^[0-9]+$ ]]; then
-              taskkill //PID $pid //F 2>/dev/null || echo "failed to kill PID $pid"
-            fi
-          done
-          sleep 2
-        fi
-        
-        echo "starting server"
-        node index.js > test_server.log 2>&1 &
-        TEST_SERVER_PID=$!
-        echo "started server with PID: $TEST_SERVER_PID"
-
-        echo "checking server readiness"
-        check_server_ready() {
-          local attempt=$1
-          local max_attempts=$2
-          
-          if RESPONSE=$(curl --connect-timeout 2 --max-time 5 https://localhost:8090 2>/dev/null); then
-            if [[ "$RESPONSE" == "ping" ]]; then
-              echo "server ready and responding correctly (attempt $attempt/$max_attempts)"
-              return 0
-            else
-              echo "server responding with unexpected content: '$RESPONSE' (attempt $attempt/$max_attempts)"
-              return 1
-            fi
-          else
-            echo "server not responding yet (attempt $attempt/$max_attempts)"
-            return 1
-          fi
+        Write-Output "checking for existing process on port 8090"
+        # Use netstat for Windows compatibility
+        $portCheck = netstat -an | Select-String ":8090"
+        if ($portCheck) {
+          Write-Output "found existing process on port 8090, attempting to kill it"
+          $processes = Get-NetTCPConnection -LocalPort 8090 -ErrorAction SilentlyContinue
+          foreach ($proc in $processes) {
+            try {
+              Stop-Process -Id $proc.OwningProcess -Force -ErrorAction SilentlyContinue
+              Write-Output "killed process with PID: $($proc.OwningProcess)"
+            } catch {
+              Write-Output "failed to kill PID $($proc.OwningProcess)"
+            }
+          }
+          Start-Sleep -Seconds 2
         }
         
-        echo "waiting for server to become ready"
-        MAX_ATTEMPTS=10
-        for ((i=1; i<=MAX_ATTEMPTS; i++)); do
-          if check_server_ready "$i" "$MAX_ATTEMPTS"; then
-            break
-          fi
+        Write-Output "starting server"
+        $serverProcess = Start-Process -FilePath "node" -ArgumentList "index.js" -RedirectStandardOutput "test_server.log" -RedirectStandardError "test_server.log" -PassThru -NoNewWindow
+        $TEST_SERVER_PID = $serverProcess.Id
+        Write-Output "started server with PID: $TEST_SERVER_PID"
+
+        Write-Output "checking server readiness"
+        function Test-ServerReady {
+          param($attempt, $maxAttempts)
           
-          if [[ $i -eq $MAX_ATTEMPTS ]]; then
-            echo "error: server failed to become ready after $MAX_ATTEMPTS attempts"
-            echo "server logs:"
-            cat test_server.log 2>/dev/null || echo "no server logs available"
-            echo "process status:"
-            if kill -0 "$TEST_SERVER_PID" 2>/dev/null; then
-              echo "server process is still running"
-            else
-              echo "server process has died"
-            fi
-            kill "$TEST_SERVER_PID" 2>/dev/null || true
-            exit 1
-          fi
-          
-          sleep 2
-        done
+          try {
+            $response = Invoke-WebRequest -Uri "https://localhost:8090" -TimeoutSec 5 -ErrorAction Stop
+            if ($response.Content -eq "ping") {
+              Write-Output "server ready and responding correctly (attempt $attempt/$maxAttempts)"
+              return $true
+            } else {
+              Write-Output "server responding with unexpected content: '$($response.Content)' (attempt $attempt/$maxAttempts)"
+              return $false
+            }
+          } catch {
+            Write-Output "server not responding yet (attempt $attempt/$maxAttempts)"
+            return $false
+          }
+        }
         
-        echo "Windows CA cert server is ready and accessible"
+        Write-Output "waiting for server to become ready"
+        $maxAttempts = 10
+        $serverReady = $false
+        for ($i = 1; $i -le $maxAttempts; $i++) {
+          if (Test-ServerReady -attempt $i -maxAttempts $maxAttempts) {
+            $serverReady = $true
+            break
+          }
+          
+          if ($i -eq $maxAttempts) {
+            Write-Output "error: server failed to become ready after $maxAttempts attempts"
+            Write-Output "server logs:"
+            try {
+              Get-Content test_server.log
+            } catch {
+              Write-Output "no server logs available"
+            }
+            Write-Output "process status:"
+            try {
+              $process = Get-Process -Id $TEST_SERVER_PID -ErrorAction Stop
+              Write-Output "server process is still running"
+            } catch {
+              Write-Output "server process has died"
+            }
+            try {
+              Stop-Process -Id $TEST_SERVER_PID -Force -ErrorAction SilentlyContinue
+            } catch {}
+            exit 1
+          }
+          
+          Start-Sleep -Seconds 2
+        }
+        
+        Write-Output "Windows CA cert server is ready and accessible"

@@ -22,21 +22,24 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      - uses: msys2/setup-msys2@v2
-        with:
-          msystem: MSYS
-          install: >-
-            base-devel
-            openssl
-            openssl-devel
+      - name: install OpenSSL with Chocolatey
+        shell: pwsh
+        run: |
+          Set-ExecutionPolicy Bypass -Scope Process -Force
+          [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+          iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+          choco install openssl -y
+          refreshenv
       - uses: actions/setup-node@v4
         with:
           node-version: v22.17.0
 
       - name: install dependencies
+        shell: pwsh
         run: npm ci --legacy-peer-deps
 
       - name: build libraries
+        shell: pwsh
         run: |
           npm run build --workspace=packages/bruno-query
           npm run build --workspace=packages/bruno-common
@@ -50,55 +53,55 @@ jobs:
         uses: ./.github/actions/server_with_ca_certs/windows
 
       - name: run cli tests
-        shell: cmd
+        shell: pwsh
         run: |
-          cd e2e-tests\ca_certs\collection
+          Set-Location "e2e-tests\ca_certs\collection"
 
-          echo "with ssl/tls disabled"
-          node ..\..\..\packages\bruno-cli\bin\bru.js run .\request.bru --output junit1.xml --insecure --format junit
-          findstr /c:"errors=\"0\"" junit1.xml > nul || exit 1
+          Write-Host "with ssl/tls disabled"
+          node "..\..\..\packages\bruno-cli\bin\bru.js" run ".\request.bru" --output "junit1.xml" --insecure --format junit
+          if (-not (Select-String -Path "junit1.xml" -Pattern 'errors="0"' -Quiet)) { exit 1 }
 
-          echo "with default/sytem ca certs"
-          node ..\..\..\packages\bruno-cli\bin\bru.js run .\request.bru --output junit2.xml --format junit
-          findstr /c:"errors=\"0\"" junit2.xml > nul || exit 1
+          Write-Host "with default/system ca certs"
+          node "..\..\..\packages\bruno-cli\bin\bru.js" run ".\request.bru" --output "junit2.xml" --format junit
+          if (-not (Select-String -Path "junit2.xml" -Pattern 'errors="0"' -Quiet)) { exit 1 }
 
-          echo "with only VALID custom ca cert and NO default/system ca certs"
-          node ..\..\..\packages\bruno-cli\bin\bru.js run .\request.bru --output junit3.xml --cacert ..\server\certs\ca-cert.pem --ignore-truststore --format junit
-          findstr /c:"errors=\"0\"" junit3.xml > nul || exit 1
+          Write-Host "with only VALID custom ca cert and NO default/system ca certs"
+          node "..\..\..\packages\bruno-cli\bin\bru.js" run ".\request.bru" --output "junit3.xml" --cacert "..\server\certs\ca-cert.pem" --ignore-truststore --format junit
+          if (-not (Select-String -Path "junit3.xml" -Pattern 'errors="0"' -Quiet)) { exit 1 }
 
-          echo "with INVALID custom ca cert and default/system ca certs"
-          node ..\..\..\packages\bruno-cli\bin\bru.js run .\request.bru --output junit4.xml --cacert ..\server\certs\ca-cert.key --format junit
-          findstr /c:"errors=\"0\"" junit4.xml > nul || exit 1
+          Write-Host "with INVALID custom ca cert and default/system ca certs"
+          node "..\..\..\packages\bruno-cli\bin\bru.js" run ".\request.bru" --output "junit4.xml" --cacert "..\server\certs\ca-cert.key" --format junit
+          if (-not (Select-String -Path "junit4.xml" -Pattern 'errors="0"' -Quiet)) { exit 1 }
 
-          echo "with INVALID custom ca cert and NO default/system ca certs"
-          echo "request will error but the pre-request test should pass"
-          node ..\..\..\packages\bruno-cli\bin\bru.js run .\request_with_fail_test_case.bru --output junit5.xml --cacert ..\server\certs\ca-key.pem --ignore-truststore --format junit --donotbailonerror
-          findstr /c:"errors=\"1\"" junit5.xml > nul || exit 1
+          Write-Host "with INVALID custom ca cert and NO default/system ca certs"
+          Write-Host "request will error but the pre-request test should pass"
+          node "..\..\..\packages\bruno-cli\bin\bru.js" run ".\request_with_fail_test_case.bru" --output "junit5.xml" --cacert "..\server\certs\ca-key.pem" --ignore-truststore --format junit --donotbailonerror
+          if (-not (Select-String -Path "junit5.xml" -Pattern 'errors="1"' -Quiet)) { exit 1 }
 
   e2e_tests:
     name: e2e tests
     timeout-minutes: 60
     runs-on: ${{ inputs.runner || 'windows-latest' }}
-    defaults:
-      run:
-        shell: msys2 {0}
     steps:
     - uses: actions/checkout@v4
-    - uses: msys2/setup-msys2@v2
-      with:
-        msystem: MSYS
-        install: >-
-          base-devel
-          openssl
-          openssl-devel
+    - name: install OpenSSL with Chocolatey
+      shell: pwsh
+      run: |
+        Set-ExecutionPolicy Bypass -Scope Process -Force
+        [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.ServicePointManager]::SecurityProtocol -bor 3072
+        iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+        choco install openssl -y
+        refreshenv
     - uses: actions/setup-node@v4
       with:
         node-version: v22.17.0
     
     - name: install dependencies
+      shell: pwsh
       run: npm ci --legacy-peer-deps
 
     - name: build libraries
+      shell: pwsh
       run: |
         npm run build:graphql-docs
         npm run build:bruno-query
@@ -113,6 +116,7 @@ jobs:
       uses: ./.github/actions/server_with_ca_certs/windows
 
     - name: run e2e tests
+      shell: pwsh
       run: npm run test:e2e ca_certs
 
     - uses: actions/upload-artifact@v4
