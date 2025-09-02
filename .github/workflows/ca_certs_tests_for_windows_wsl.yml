@@ -1,4 +1,4 @@
-name: CA certs tests for windows os
+name: CA certs tests for windows os (WSL)
 on:
   workflow_dispatch:
     inputs:
@@ -22,13 +22,16 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
-      - uses: msys2/setup-msys2@v2
+      
+      # Install WSL with Ubuntu
+      - uses: Vampire/setup-wsl@v3
         with:
-          msystem: MSYS
-          install: >-
-            base-devel
+          distribution: Ubuntu-22.04
+          additional-packages:
             openssl
-            openssl-devel
+            curl
+            ca-certificates
+      
       - uses: actions/setup-node@v4
         with:
           node-version: v22.17.0
@@ -47,7 +50,7 @@ jobs:
 
       - name: setup CA certificates and start the ca certs server
         id: ca-server
-        uses: ./.github/actions/server_with_ca_certs/windows
+        uses: ./.github/actions/server_with_ca_certs/windows-wsl
 
       - name: run cli tests
         shell: cmd
@@ -79,18 +82,18 @@ jobs:
     name: e2e tests
     timeout-minutes: 60
     runs-on: ${{ inputs.runner || 'windows-latest' }}
-    defaults:
-      run:
-        shell: msys2 {0}
     steps:
     - uses: actions/checkout@v4
-    - uses: msys2/setup-msys2@v2
+    
+    # Install WSL with Ubuntu
+    - uses: Vampire/setup-wsl@v3
       with:
-        msystem: MSYS
-        install: >-
-          base-devel
+        distribution: Ubuntu-22.04
+        additional-packages:
           openssl
-          openssl-devel
+          curl
+          ca-certificates
+          
     - uses: actions/setup-node@v4
       with:
         node-version: v22.17.0
@@ -110,7 +113,7 @@ jobs:
 
     - name: setup CA certificates and start the ca certs server
       id: ca-server
-      uses: ./.github/actions/server_with_ca_certs/windows
+      uses: ./.github/actions/server_with_ca_certs/windows-wsl
 
     - name: run e2e tests
       run: npm run test:e2e ca_certs
@@ -118,6 +121,6 @@ jobs:
     - uses: actions/upload-artifact@v4
       if: ${{ !cancelled() }}
       with:
-        name: playwright-report-windows
+        name: playwright-report-windows-wsl
         path: playwright-report/
         retention-days: 30

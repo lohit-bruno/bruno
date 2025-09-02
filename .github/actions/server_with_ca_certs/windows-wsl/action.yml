@@ -1,64 +1,52 @@
-name: 'setup server with ca certs for windows os'
-description: 'generate CA certificates, configure Windows system trust, and prepare HTTPS test server'
+name: 'setup server with ca certs for windows os using WSL'
+description: 'generate CA certificates using WSL, configure Windows system trust, and prepare HTTPS test server'
 
 runs:
   using: 'composite'
   steps:
-    - name: setup Git Bash environment
-      shell: powershell
-      run: |
-        $ErrorActionPreference = "Stop"
-        # Ensure Git is in PATH for bash operations
-        $gitPath = (Get-Command git -ErrorAction SilentlyContinue).Source
-        if ($gitPath) {
-          $gitDir = Split-Path (Split-Path $gitPath -Parent) -Parent
-          $bashPath = Join-Path $gitDir "bin\bash.exe"
-          Write-Output "Git Bash found at: $bashPath"
-          if (Test-Path $bashPath) {
-            Write-Output "Git Bash is available for shell operations"
-          } else {
-            Write-Output "Warning: Git Bash executable not found"
-          }
-        } else {
-          Write-Output "ERROR: Git not found in PATH"
-          exit 1
-        }
-        Write-Output "Git Bash environment verified"
-    - name: verify OpenSSL availability
-      shell: msys2 {0}
+    - name: verify WSL and OpenSSL availability
+      shell: wsl-bash {0}
       run: |
         set -euo pipefail
         
-        # Check if OpenSSL is available in MSYS2 environment
+        echo "WSL Environment:"
+        uname -a
+        
+        # Check if OpenSSL is available in WSL
         if command -v openssl &> /dev/null; then
           echo "OpenSSL found: $(openssl version)"
         else
-          echo "ERROR: OpenSSL not found in MSYS2 PATH"
-          echo "Please ensure MSYS2 is properly set up with OpenSSL"
-          exit 1
+          echo "ERROR: OpenSSL not found in WSL environment"
+          echo "Installing OpenSSL..."
+          sudo apt-get update
+          sudo apt-get install -y openssl ca-certificates
         fi
         
-        echo "OpenSSL verified for Windows"
+        echo "OpenSSL verified for WSL"
 
     - name: create certificate directories
-      shell: msys2 {0}
+      shell: wsl-bash {0}
       run: |
         set -euo pipefail
 
         rm -rf e2e-tests/ca_certs/server/certs
         mkdir -p e2e-tests/ca_certs/server/certs
 
-        echo "certificate directory `certs` created successfully"
+        echo "certificate directory \`certs\` created successfully"
 
-    - name: generate CA certificates
+    - name: generate CA certificates using WSL
       id: generate-certs
-      shell: msys2 {0}
+      shell: wsl-bash {0}
       working-directory: e2e-tests/ca_certs/server
       run: |
         set -euo pipefail
 
-        chmod +x generate_certs_windows.sh
-        ./generate_certs_windows.sh
+        # Use Linux certificate generation script in WSL
+        chmod +x generate_certs.sh
+        ./generate_certs.sh
+
+        # Convert PEM to DER format for Windows truststore
+        openssl x509 -in certs/ca-cert.pem -outform DER -out certs/ca-cert.cer
 
         CA_CERT_PATH="$(pwd)/certs/ca-cert.pem"
         CA_CERT_DER_PATH="$(pwd)/certs/ca-cert.cer"
@@ -67,13 +55,13 @@ runs:
         echo "Windows DER certificate at $CA_CERT_DER_PATH"
 
     - name: verify generated certificates
-      shell: msys2 {0}
+      shell: wsl-bash {0}
       working-directory: e2e-tests/ca_certs/server/certs
       run: |
         set -euo pipefail
 
-        # Check that all required certificate files exist (Windows generates additional formats)
-        if [[ ! -f "ca-cert.pem" || ! -f "ca-cert.cer" || ! -f "localhost-cert.pem" || ! -f "localhost-key.pem" || ! -f "localhost.p12" ]]; then
+        # Check that all required certificate files exist
+        if [[ ! -f "ca-cert.pem" || ! -f "ca-cert.cer" || ! -f "localhost-cert.pem" || ! -f "localhost-key.pem" ]]; then
           echo "error: required certificate files are missing"
           ls -la || true
           exit 1
@@ -87,6 +75,19 @@ runs:
         openssl x509 -in localhost-cert.pem -text -noout | head -20
         
         echo "certificate verification completed successfully"
+
+    - name: convert WSL path to Windows path for truststore
+      shell: powershell
+      run: |
+        $ErrorActionPreference = "Stop"
+        
+        # Get the Windows path for the certificate
+        $wslPath = "/mnt/c/Users/runneradmin/work/$env:GITHUB_REPOSITORY"
+        $wslPath = $wslPath.Replace("$env:GITHUB_REPOSITORY_OWNER/", "")
+        $winPath = "C:\Users\runneradmin\work\$env:GITHUB_REPOSITORY\e2e-tests\ca_certs\server\certs\ca-cert.cer"
+        
+        Write-Output "Certificate will be loaded from: $winPath"
+        Write-Output "cert_path=$winPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
     - name: add CA certificate to Windows truststore
       shell: powershell
@@ -116,13 +117,13 @@ runs:
           exit 1
         }
 
-    - name: start and verify server
+    - name: start and verify server in WSL
       id: verify-setup
-      shell: msys2 {0}
+      shell: wsl-bash {0}
       working-directory: e2e-tests/ca_certs/server
       run: |
         set -euo pipefail
-        echo "verifying server setup readiness"
+        echo "verifying server setup readiness in WSL"
         
         if [[ ! -f "index.js" ]]; then
           echo "error: server file not found"
@@ -130,8 +131,8 @@ runs:
         fi
         echo "server script found and accessible"
         
-        # verify all required certificates are present (Windows needs p12 bundle)
-        REQUIRED_CERTS=("certs/ca-cert.pem" "certs/ca-cert.cer" "certs/localhost-cert.pem" "certs/localhost-key.pem" "certs/localhost.p12")
+        # verify all required certificates are present
+        REQUIRED_CERTS=("certs/ca-cert.pem" "certs/ca-cert.cer" "certs/localhost-cert.pem" "certs/localhost-key.pem")
         for cert_file in "${REQUIRED_CERTS[@]}"; do
           if [[ ! -f "$cert_file" ]]; then
             echo "error: required certificate file missing: $cert_file"
@@ -140,22 +141,16 @@ runs:
             exit 1
           fi
         done
-        echo "all required certificates are present for Windows"
+        echo "all required certificates are present"
         
         echo "checking for existing process on port 8090"
-        # Use netstat for Windows compatibility (works in Git Bash)
-        if netstat -an | grep -q ":8090"; then
+        if netstat -tulpn 2>/dev/null | grep -q ":8090"; then
           echo "found existing process on port 8090, attempting to kill it"
-          # Try to find and kill the process using taskkill
-          for pid in $(netstat -ano | grep ":8090" | awk '{print $5}' | sort -u); do
-            if [[ "$pid" =~ ^[0-9]+$ ]]; then
-              taskkill //PID $pid //F 2>/dev/null || echo "failed to kill PID $pid"
-            fi
-          done
+          fuser -k 8090/tcp 2>/dev/null || echo "no process found to kill"
           sleep 2
         fi
         
-        echo "starting server"
+        echo "starting server in WSL"
         node index.js > test_server.log 2>&1 &
         TEST_SERVER_PID=$!
         echo "started server with PID: $TEST_SERVER_PID"
@@ -165,7 +160,7 @@ runs:
           local attempt=$1
           local max_attempts=$2
           
-          if RESPONSE=$(curl --connect-timeout 2 --max-time 5 https://localhost:8090 2>/dev/null); then
+          if RESPONSE=$(curl --connect-timeout 2 --max-time 5 -k https://localhost:8090 2>/dev/null); then
             if [[ "$RESPONSE" == "ping" ]]; then
               echo "server ready and responding correctly (attempt $attempt/$max_attempts)"
               return 0
@@ -203,4 +198,4 @@ runs:
           sleep 2
         done
         
-        echo "Windows CA cert server is ready and accessible"
+        echo "WSL-based CA cert server is ready and accessible"
