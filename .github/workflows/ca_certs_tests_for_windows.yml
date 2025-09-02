@@ -22,6 +22,24 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+      - name: install PowerShell Core
+        shell: powershell
+        run: |
+          $ErrorActionPreference = "Stop"
+          Write-Output "Installing PowerShell Core (pwsh)..."
+          
+          # Install PowerShell Core using winget (available on GitHub Actions runners)
+          winget install --id Microsoft.Powershell --source winget --accept-package-agreements --accept-source-agreements
+          
+          # Add PowerShell Core to PATH for current session
+          $pwshPath = "${env:ProgramFiles}\PowerShell\7"
+          if (Test-Path $pwshPath) {
+            $env:PATH = "$pwshPath;$env:PATH"
+            Write-Output "PowerShell Core installed and added to PATH"
+          } else {
+            Write-Output "Error: PowerShell Core installation failed"
+            exit 1
+          }
       - name: install OpenSSL with Chocolatey
         shell: pwsh
         run: |
@@ -84,6 +102,24 @@ jobs:
     runs-on: ${{ inputs.runner || 'windows-latest' }}
     steps:
     - uses: actions/checkout@v4
+    - name: install PowerShell Core
+      shell: powershell
+      run: |
+        $ErrorActionPreference = "Stop"
+        Write-Output "Installing PowerShell Core (pwsh)..."
+        
+        # Install PowerShell Core using winget (available on GitHub Actions runners)
+        winget install --id Microsoft.Powershell --source winget --accept-package-agreements --accept-source-agreements
+        
+        # Add PowerShell Core to PATH for current session
+        $pwshPath = "${env:ProgramFiles}\PowerShell\7"
+        if (Test-Path $pwshPath) {
+          $env:PATH = "$pwshPath;$env:PATH"
+          Write-Output "PowerShell Core installed and added to PATH"
+        } else {
+          Write-Output "Error: PowerShell Core installation failed"
+          exit 1
+        }
     - name: install OpenSSL with Chocolatey
       shell: pwsh
       run: |

@@ -1,8 +1,8 @@
-#Requires -Version 5.1
+#Requires -Version 7.0
 
 <#
 .SYNOPSIS
-    Custom Certificate Authority Generator for Local Development - Windows PowerShell Version
+    Custom Certificate Authority Generator for Local Development - PowerShell Core Version
 
 .DESCRIPTION
     This script creates a custom Certificate Authority (CA) and generates 
@@ -25,7 +25,7 @@
     - CA validity: 10 years, localhost certificate validity: 1 year
 
     Requirements:
-    - PowerShell 5.1 or later
+    - PowerShell Core 7.0 or later
     - OpenSSL must be available in PATH
     - Write permissions to current directory
 
@@ -49,7 +49,7 @@ $CERTS_DIR = "./certs"
 $CA_SUBJECT = "/C=US/ST=Dev/L=Local/O=Local Development CA/CN=Local Dev CA"
 $SERVER_SUBJECT = "/C=US/ST=Dev/L=Local/O=Local Development/CN=localhost"
 
-Write-Host "Generating Custom CA for Local Development (Windows PowerShell)" -ForegroundColor Green
+Write-Host "Generating Custom CA for Local Development (PowerShell Core)" -ForegroundColor Green
 Write-Host "================================================================"
 
 # Set error handling
