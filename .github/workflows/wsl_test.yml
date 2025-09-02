@@ -4,7 +4,7 @@ on: workflow_dispatch
 
 jobs:
   quick-wsl-test:
-    runs-on: windows-latest
+    runs-on: self_hosted_windows
     steps:
     - uses: actions/checkout@v4
     - uses: Vampire/setup-wsl@v3
