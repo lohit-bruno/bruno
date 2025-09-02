@@ -6,6 +6,16 @@ if (process.env.CI) {
   reporter.push(['github']);
 }
 
+const testsToIgnore = [
+  'ca_certs/**' // CA certificate tests require separate server setup and certificate generation
+];
+
+// remove test paths from the ignore list if they are explicitly specified in CLI arguments
+// example: when running `npm run test:e2e ca_certs`, remove 'ca_certs/**' from ignore list
+const filteredTestsToIgnore = testsToIgnore.filter(testPath => 
+  process.argv.some(arg => arg.startsWith(testPath.replace(/\*/g, '')))
+);
+
 export default defineConfig({
   testDir: './e2e-tests',
   fullyParallel: false,
@@ -17,6 +27,8 @@ export default defineConfig({
   use: {
     trace: process.env.CI ? 'on-first-retry' : 'on'
   },
+
+  testIgnore: filteredTestsToIgnore,
 
   projects: [
     {
