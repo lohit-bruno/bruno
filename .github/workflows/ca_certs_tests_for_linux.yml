@@ -41,14 +41,10 @@ jobs:
           npm run build --workspace=packages/bruno-requests
           npm run build --workspace=packages/bruno-filestore
 
-      - name: setup CA certificates and start the ca certs server
-        id: ca-server
-        uses: ./.github/actions/server_with_ca_certs/linux
-
       - name: run cli tests
         run: |
           set -euo pipefail
-          
+
           # navigate to CA certificates test collection directory
           cd e2e-tests/ca_certs/collection
 
