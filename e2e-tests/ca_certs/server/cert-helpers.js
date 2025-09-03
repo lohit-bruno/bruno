@@ -138,18 +138,80 @@ function addCAToTruststore(certsDir) {
       execCommand('sudo update-ca-certificates');
       break;
     case 'windows':
-      // Use DER format for Windows
-      const winCertPath = path.join(certsDir, 'ca-cert.der');
-      try {
-        execCommand(`powershell -Command "Import-Certificate -FilePath '${winCertPath}' -CertStoreLocation Cert:\\CurrentUser\\Root"`);
-      } catch (error) {
-        try {
-          execCommand(`certutil -user -addstore -f "Root" "${winCertPath}"`);
-        } catch (error2) {
-          execCommand(`certutil -addstore -f "Root" "${winCertPath}"`);
-        }
-      }
+      addCAToWindowsTruststore(certsDir);
       break;
+  }
+}
+
+function addCAToWindowsTruststore(certsDir) {
+  const winCertPath = path.join(certsDir, 'ca-cert.der');
+  const winCertPathEscaped = winCertPath.replace(/\\/g, '\\\\').replace(/'/g, "''");
+  
+  const methods = [
+    // Method 1: PowerShell Import-Certificate (most reliable, works on Windows 8+)
+    {
+      name: 'PowerShell Import-Certificate',
+      command: `powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Import-Certificate -FilePath '${winCertPathEscaped}' -CertStoreLocation 'Cert:\\CurrentUser\\Root' -Confirm:$false -ErrorAction Stop; Write-Host 'Certificate imported successfully'; exit 0 } catch { Write-Error $_.Exception.Message; exit 1 }"`
+    },
+    // Method 2: PowerShell with certificate store object (alternative approach)
+    {
+      name: 'PowerShell Certificate Store',
+      command: `powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2('${winCertPathEscaped}'); $store = New-Object System.Security.Cryptography.X509Certificates.X509Store('Root', 'CurrentUser'); $store.Open('ReadWrite'); $store.Add($cert); $store.Close(); Write-Host 'Certificate added to store successfully'; exit 0 } catch { Write-Error $_.Exception.Message; exit 1 }"`
+    },
+    // Method 3: certutil for current user (classic method)
+    {
+      name: 'certutil current user',
+      command: `certutil -user -addstore -f "Root" "${winCertPath}"`
+    },
+    // Method 4: certutil for local machine (requires admin)
+    {
+      name: 'certutil local machine',
+      command: `certutil -addstore -f "Root" "${winCertPath}"`
+    }
+  ];
+  
+  let lastError;
+  for (const method of methods) {
+    try {
+      console.log(`Attempting to add CA certificate using: ${method.name}`);
+      execCommandSilent(method.command);
+      
+      // Verify the certificate was actually installed
+      if (verifyWindowsCertificateInstalled(certsDir)) {
+        console.log(`✓ CA certificate successfully installed using: ${method.name}`);
+        return;
+      } else {
+        console.log(`⚠ Certificate installation appeared to succeed but verification failed for: ${method.name}`);
+      }
+    } catch (error) {
+      lastError = error;
+      console.log(`✗ Failed to install CA certificate using ${method.name}: ${error.message}`);
+      continue;
+    }
+  }
+  
+  throw new Error(`Failed to install CA certificate using any method. Last error: ${lastError?.message || 'Unknown error'}`);
+}
+
+function verifyWindowsCertificateInstalled(certsDir) {
+  try {
+    const winCertPath = path.join(certsDir, 'ca-cert.der');
+    
+    // Get the certificate thumbprint for verification
+    const thumbprintResult = execCommandSilent(`powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2('${winCertPath.replace(/\\/g, '\\\\').replace(/'/g, "''")}'); $cert.Thumbprint } catch { exit 1 }"`);
+    const expectedThumbprint = thumbprintResult.toString().trim();
+    
+    if (!expectedThumbprint) {
+      return false;
+    }
+    
+    // Check if certificate exists in the store
+    const checkResult = execCommandSilent(`powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $store = New-Object System.Security.Cryptography.X509Certificates.X509Store('Root', 'CurrentUser'); $store.Open('ReadOnly'); $cert = $store.Certificates | Where-Object { $_.Thumbprint -eq '${expectedThumbprint}' }; $store.Close(); if ($cert) { 'FOUND' } else { 'NOT_FOUND' } } catch { 'ERROR' }"`);
+    
+    return checkResult.toString().trim() === 'FOUND';
+  } catch (error) {
+    console.log(`Certificate verification failed: ${error.message}`);
+    return false;
   }
 }
 
@@ -192,6 +254,8 @@ module.exports = {
   createCertsDir,
   generateCertificates,
   addCAToTruststore,
+  addCAToWindowsTruststore,
+  verifyWindowsCertificateInstalled,
   verifyCertificates,
   getServerCertificateOptions,
   detectPlatform,
