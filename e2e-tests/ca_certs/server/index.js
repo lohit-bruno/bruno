@@ -52,6 +52,15 @@ const {
     await waitForServer(port, 5);
 
     console.log(`server is ready on port ${port}`);
+    
+    // Windows-specific SSL note
+    const platform = require('./cert-helpers').detectPlatform();
+    if (platform === 'windows') {
+      console.log('\nWindows SSL Note:');
+      console.log('If you get SSL errors like "CRYPT_E_NO_REVOCATION_CHECK", try:');
+      console.log('- Use: curl -k https://localhost:8090 (to bypass SSL checks)');
+      console.log('- Or manually import ca-cert.der into Windows Certificate Manager');
+    }
 
     // Setup graceful shutdown
     setupGracefulShutdown(server, () => {
