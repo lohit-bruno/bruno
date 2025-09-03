@@ -67,9 +67,6 @@ const {
       console.log('cleaning up...');
     });
 
-    // Keep alive
-    process.stdin.resume();
-
   } catch (error) {
     console.error('\nserver setup failed!');
     console.error('error:', error.message);
