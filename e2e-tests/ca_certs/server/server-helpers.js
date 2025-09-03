@@ -23,7 +23,9 @@ function killProcessOnPort(port) {
         }
         break;
     }
-  } catch (error) {}
+  } catch (error) {
+    throw error;
+  }
 }
 
 function createServer(certsDir, port = 8090) {
