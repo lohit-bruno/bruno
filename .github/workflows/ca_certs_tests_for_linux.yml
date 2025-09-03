@@ -110,6 +110,15 @@ jobs:
 
     - name: run e2e tests
       run: |
+
+        cd e2e-tests/ca_certs/server
+
+        # start the server
+        node ./index.js
+
+        # navigate project root
+        cd ../../../
+
         xvfb-run npm run test:e2e:ca_certs
 
     - uses: actions/upload-artifact@v4

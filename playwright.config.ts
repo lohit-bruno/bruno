@@ -41,11 +41,6 @@ export default defineConfig({
       command: 'npm start --workspace=packages/bruno-tests',
       url: 'http://localhost:8081/ping',
       reuseExistingServer: !process.env.CI
-    },
-    {
-      command: 'node ./e2e-tests/ca_certs/server/index.js',
-      url: 'https://localhost:8090',
-      reuseExistingServer: !process.env.CI
     }
   ]
 });

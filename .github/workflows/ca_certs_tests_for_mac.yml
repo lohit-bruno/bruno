@@ -105,6 +105,14 @@ jobs:
       run: |
         set -euo pipefail
 
+        cd e2e-tests/ca_certs/server
+
+        # start the server
+        node ./index.js
+
+        # navigate project root
+        cd ../../../
+
         npm run test:e2e:ca_certs
 
     - uses: actions/upload-artifact@v4
