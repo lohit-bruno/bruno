@@ -62,7 +62,8 @@ const {
     process.stdin.resume();
 
   } catch (error) {
-    console.error('server setup failed!', error.message);
+    console.error('\nserver setup failed!');
+    console.error('error:', error.message);
     process.exit(1);
   }
 })();

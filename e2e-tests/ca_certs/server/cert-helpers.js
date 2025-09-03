@@ -61,13 +61,13 @@ function installOpenSSL() {
             // Try winget as fallback
             execCommandSilent('winget install ShiningLight.OpenSSL');
           } catch (error2) {
-            console.warn('neither chocolatey nor winget found. please install openssl manually.');
+            throw new Error('openssl installation failed: neither chocolatey nor winget found. please install openssl manually and try again.');
           }
         }
         break;
     }
   } catch (error) {
-    console.warn('could not install openssl automatically. please install manually.');
+    throw new Error('failed to install openssl. please install manually and try again.');
   }
 }
 
@@ -148,36 +148,32 @@ IP.2 = ::1`;
 function addCAToTruststore(certsDir) {
   const platform = detectPlatform();
   
-  try {
-    switch (platform) {
-      case 'macos':
-        const macCertPath = path.join(certsDir, 'ca-cert.pem');
-        execCommand(`sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "${macCertPath}"`);
-        break;
-      case 'linux':
-        const linuxCertPath = path.join(certsDir, 'ca-cert.pem');
-        execCommand(`sudo cp "${linuxCertPath}" /usr/local/share/ca-certificates/bruno-ca.crt`);
-        execCommand('sudo update-ca-certificates');
-        break;
-      case 'windows':
-        // Use DER format for Windows
-        const winCertPath = path.join(certsDir, 'ca-cert.der');
+  switch (platform) {
+    case 'macos':
+      const macCertPath = path.join(certsDir, 'ca-cert.pem');
+      execCommand(`sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "${macCertPath}"`);
+      break;
+    case 'linux':
+      const linuxCertPath = path.join(certsDir, 'ca-cert.pem');
+      execCommand(`sudo cp "${linuxCertPath}" /usr/local/share/ca-certificates/bruno-ca.crt`);
+      execCommand('sudo update-ca-certificates');
+      break;
+    case 'windows':
+      // Use DER format for Windows
+      const winCertPath = path.join(certsDir, 'ca-cert.der');
+      try {
+        // Try current user store first (no admin required)
+        execCommandSilent(`powershell -Command "Import-Certificate -FilePath '${winCertPath}' -CertStoreLocation Cert:\\CurrentUser\\Root"`);
+      } catch (error) {
         try {
-          // Use PowerShell to import DER certificate to Trusted Root store
-          execCommandSilent(`powershell -Command "Import-Certificate -FilePath '${winCertPath}' -CertStoreLocation Cert:\\LocalMachine\\Root"`);
-        } catch (error) {
-          try {
-            // Fallback: try certutil with DER format
-            execCommandSilent(`certutil -addstore -f "Root" "${winCertPath}"`);
-          } catch (error2) {
-            // Both methods failed, but don't throw - truststore is optional
-            throw error2;
-          }
+          // Fallback: try certutil for current user
+          execCommandSilent(`certutil -user -addstore -f "Root" "${winCertPath}"`);
+        } catch (error2) {
+          // Last resort: try system-wide (requires admin) - will throw if fails
+          execCommandSilent(`certutil -addstore -f "Root" "${winCertPath}"`);
         }
-        break;
-    }
-  } catch (error) {
-    console.warn('could not add ca to system truststore (optional)');
+      }
+      break;
   }
 }
 
