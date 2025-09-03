@@ -372,15 +372,30 @@ jobs:
           
           Write-Host "server started with Job ID: $($job.Id)"
           
-          # wait for server to be ready
-          Start-Sleep -Seconds 10
+          # wait for server to be ready with retry logic
+          $MaxWaitTime = 30
+          $WaitInterval = 2
+          $ElapsedTime = 0
           
-          # verify server is running
+          Write-Host "waiting for server to be ready (max ${MaxWaitTime}s)..."
+          while ($ElapsedTime -lt $MaxWaitTime) {
+            try {
+              $response = Invoke-WebRequest -Uri "https://localhost:8090" -TimeoutSec 3 -ErrorAction Stop
+              Write-Host "server is responding after ${ElapsedTime}s"
+              break
+            } catch {
+              Write-Host "server not ready yet, waiting ${WaitInterval}s... (${ElapsedTime}s/${MaxWaitTime}s)"
+              Start-Sleep -Seconds $WaitInterval
+              $ElapsedTime += $WaitInterval
+            }
+          }
+          
+          # final verification
           try {
-            $response = Invoke-WebRequest -Uri "https://localhost:8090" -TimeoutSec 10
-            Write-Host "server is responding"
+            $response = Invoke-WebRequest -Uri "https://localhost:8090" -TimeoutSec 3
+            Write-Host "server is ready and responding"
           } catch {
-            Write-Host "server is not responding"
+            Write-Host "server failed to start within ${MaxWaitTime}s"
             Stop-Job $job
             Remove-Job $job
             exit 1
@@ -481,20 +496,32 @@ jobs:
         
         Set-Location e2e-tests\ca_certs\server
         
-        Write-Host "starting server in background"
-        $job = Start-Job -ScriptBlock { node index.js }
-        
         Write-Host "server started with Job ID: $($job.Id)"
         
-        # wait for server to be ready
-        Start-Sleep -Seconds 10
+        # wait for server to be ready with retry logic
+        $MaxWaitTime = 30
+        $WaitInterval = 2
+        $ElapsedTime = 0
         
-        # verify server is running
+        Write-Host "waiting for server to be ready (max ${MaxWaitTime}s)..."
+        while ($ElapsedTime -lt $MaxWaitTime) {
+          try {
+            $response = Invoke-WebRequest -Uri "https://localhost:8090" -TimeoutSec 3 -ErrorAction Stop
+            Write-Host "server is responding after ${ElapsedTime}s"
+            break
+          } catch {
+            Write-Host "server not ready yet, waiting ${WaitInterval}s... (${ElapsedTime}s/${MaxWaitTime}s)"
+            Start-Sleep -Seconds $WaitInterval
+            $ElapsedTime += $WaitInterval
+          }
+        }
+        
+        # final verification
         try {
-          $response = Invoke-WebRequest -Uri "https://localhost:8090" -TimeoutSec 10
-          Write-Host "server is responding"
+          $response = Invoke-WebRequest -Uri "https://localhost:8090" -TimeoutSec 3
+          Write-Host "server is ready and responding"
         } catch {
-          Write-Host "server is not responding"
+          Write-Host "server failed to start within ${MaxWaitTime}s"
           Stop-Job $job
           Remove-Job $job
           exit 1

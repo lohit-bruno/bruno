@@ -1,0 +1,226 @@
+name: CA certs tests
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  cli_tests_windows:
+    name: cli tests for windows
+    runs-on: self_hosted_windows
+    permissions:
+      checks: write
+      pull-requests: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: v22.17.0
+
+      - name: setup CA certificates
+        shell: powershell
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = "Stop"
+          
+          Set-Location e2e-tests\ca_certs\server
+          
+          Write-Host "running certificate setup"
+          node setup.js
+
+      - name: start test server
+        shell: powershell
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = "Stop"
+          
+          Set-Location e2e-tests\ca_certs\server
+          
+          Write-Host "starting server in background"
+          $job = Start-Job -ScriptBlock { node index.js }
+          
+          Write-Host "server started with Job ID: $($job.Id)"
+          
+          # wait for server to be ready with retry logic
+          $MaxWaitTime = 30
+          $WaitInterval = 2
+          $ElapsedTime = 0
+          
+          Write-Host "waiting for server to be ready (max ${MaxWaitTime}s)..."
+          while ($ElapsedTime -lt $MaxWaitTime) {
+            try {
+              $response = Invoke-WebRequest -Uri "https://localhost:8090" -TimeoutSec 3 -ErrorAction Stop
+              Write-Host "server is responding after ${ElapsedTime}s"
+              break
+            } catch {
+              Write-Host "server not ready yet, waiting ${WaitInterval}s... (${ElapsedTime}s/${MaxWaitTime}s)"
+              Start-Sleep -Seconds $WaitInterval
+              $ElapsedTime += $WaitInterval
+            }
+          }
+          
+          # final verification
+          try {
+            $response = Invoke-WebRequest -Uri "https://localhost:8090" -TimeoutSec 3
+            Write-Host "server is ready and responding"
+          } catch {
+            Write-Host "server failed to start within ${MaxWaitTime}s"
+            Stop-Job $job
+            Remove-Job $job
+            exit 1
+          }
+
+      - name: install node dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: build libraries
+        run: |
+          npm run build --workspace=packages/bruno-query
+          npm run build --workspace=packages/bruno-common
+          npm run sandbox:bundle-libraries --workspace=packages/bruno-js
+          npm run build --workspace=packages/bruno-converters
+          npm run build --workspace=packages/bruno-requests
+          npm run build --workspace=packages/bruno-filestore
+
+      - name: run cli tests
+        shell: powershell
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = "Stop"
+          
+          # navigate to CA certificates test collection directory
+          Set-Location e2e-tests\ca_certs\collection
+
+          Write-Host "with ssl/tls disabled"
+          # should pass
+          node ..\..\..\packages\bruno-cli\bin\bru.js run .\request.bru --output junit1.xml --insecure --format junit
+          [xml]$xml1 = Get-Content junit1.xml
+          $testsuites1 = if ($xml1.testsuites) { $xml1.testsuites.testsuite } else { $xml1.testsuite }
+          $errorCount1 = ($testsuites1 | Where-Object { $_.errors -eq "0" } | Measure-Object).Count
+          if ($errorCount1 -ne 1) { exit 1 }
+
+          Write-Host "with default/sytem ca certs"
+          # should pass
+          node ..\..\..\packages\bruno-cli\bin\bru.js run .\request.bru --output junit2.xml --format junit
+          [xml]$xml2 = Get-Content junit2.xml
+          $testsuites2 = if ($xml2.testsuites) { $xml2.testsuites.testsuite } else { $xml2.testsuite }
+          $errorCount2 = ($testsuites2 | Where-Object { $_.errors -eq "0" } | Measure-Object).Count
+          if ($errorCount2 -ne 1) { exit 1 }
+
+          Write-Host "with only VALID custom ca cert and NO default/system ca certs"
+          # should pass
+          node ..\..\..\packages\bruno-cli\bin\bru.js run .\request.bru --output junit3.xml --cacert ..\server\certs\ca-cert.pem --ignore-truststore --format junit
+          [xml]$xml3 = Get-Content junit3.xml
+          $testsuites3 = if ($xml3.testsuites) { $xml3.testsuites.testsuite } else { $xml3.testsuite }
+          $errorCount3 = ($testsuites3 | Where-Object { $_.errors -eq "0" } | Measure-Object).Count
+          if ($errorCount3 -ne 1) { exit 1 }
+
+          Write-Host "with INVALID custom ca cert and default/system ca certs"
+          # should pass
+          node ..\..\..\packages\bruno-cli\bin\bru.js run .\request.bru --output junit4.xml --cacert ..\server\certs\ca-cert.key --format junit
+          [xml]$xml4 = Get-Content junit4.xml
+          $testsuites4 = if ($xml4.testsuites) { $xml4.testsuites.testsuite } else { $xml4.testsuite }
+          $errorCount4 = ($testsuites4 | Where-Object { $_.errors -eq "0" } | Measure-Object).Count
+          if ($errorCount4 -ne 1) { exit 1 }
+
+          Write-Host "with INVALID custom ca cert and NO default/system ca certs"
+          Write-Host "request will error but the pre-request test should pass"
+          # should fail
+          try {
+            node ..\..\..\packages\bruno-cli\bin\bru.js run .\request.bru --output junit5.xml --cacert ..\server\certs\ca-key.pem --ignore-truststore --format junit 2>$null
+          } catch {
+            # Expected to fail
+          }
+          [xml]$xml5 = Get-Content junit5.xml
+          $testsuites5 = if ($xml5.testsuites) { $xml5.testsuites.testsuite } else { $xml5.testsuite }
+          $errorCount5 = ($testsuites5 | Where-Object { $_.errors -eq "1" } | Measure-Object).Count
+          if ($errorCount5 -ne 1) { exit 1 }
+
+  e2e_tests_windows:
+    name: e2e tests for windows
+    timeout-minutes: 60
+    runs-on: self_hosted_windows
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: v22.17.0
+
+      - name: setup CA certificates
+        shell: powershell
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = "Stop"
+          
+          Set-Location e2e-tests\ca_certs\server
+          
+          Write-Host "running certificate setup"
+          node setup.js
+
+      - name: start test server
+        shell: powershell
+        run: |
+          Set-StrictMode -Version Latest
+          $ErrorActionPreference = "Stop"
+          
+          Set-Location e2e-tests\ca_certs\server
+          
+          Write-Host "starting server in background"
+          $job = Start-Job -ScriptBlock { node index.js }
+          
+          Write-Host "server started with Job ID: $($job.Id)"
+          
+          # wait for server to be ready with retry logic
+          $MaxWaitTime = 30
+          $WaitInterval = 2
+          $ElapsedTime = 0
+          
+          Write-Host "waiting for server to be ready (max ${MaxWaitTime}s)..."
+          while ($ElapsedTime -lt $MaxWaitTime) {
+            try {
+              $response = Invoke-WebRequest -Uri "https://localhost:8090" -TimeoutSec 3 -ErrorAction Stop
+              Write-Host "server is responding after ${ElapsedTime}s"
+              break
+            } catch {
+              Write-Host "server not ready yet, waiting ${WaitInterval}s... (${ElapsedTime}s/${MaxWaitTime}s)"
+              Start-Sleep -Seconds $WaitInterval
+              $ElapsedTime += $WaitInterval
+            }
+          }
+          
+          # final verification
+          try {
+            $response = Invoke-WebRequest -Uri "https://localhost:8090" -TimeoutSec 3
+            Write-Host "server is ready and responding"
+          } catch {
+            Write-Host "server failed to start within ${MaxWaitTime}s"
+            Stop-Job $job
+            Remove-Job $job
+            exit 1
+          }
+
+      - name: install node dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: build libraries
+        run: |
+          npm run build:graphql-docs
+          npm run build:bruno-query
+          npm run build:bruno-common
+          npm run sandbox:bundle-libraries --workspace=packages/bruno-js
+          npm run build:bruno-converters
+          npm run build:bruno-requests
+          npm run build:bruno-filestore
+
+      - name: run e2e tests
+        run: npm run test:e2e:ca_certs
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: playwright-report-windows
+          path: playwright-report/
+          retention-days: 30
