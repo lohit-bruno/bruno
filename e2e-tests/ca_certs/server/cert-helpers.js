@@ -38,7 +38,7 @@ function installOpenSSL() {
   
   // Check if OpenSSL is already available
   try {
-    execCommandSilent('openssl version');
+    execCommand('openssl version');
     return; // OpenSSL is already installed, no need to install
   } catch (error) {
     // OpenSSL not found, proceed with installation
@@ -166,14 +166,14 @@ function addCAToTruststore(certsDir) {
       const winCertPath = path.join(certsDir, 'ca-cert.der');
       try {
         // Try current user store first (no admin required)
-        execCommandSilent(`powershell -Command "Import-Certificate -FilePath '${winCertPath}' -CertStoreLocation Cert:\\CurrentUser\\Root"`);
+        execCommand(`powershell -Command "Import-Certificate -FilePath '${winCertPath}' -CertStoreLocation Cert:\\CurrentUser\\Root"`);
       } catch (error) {
         try {
           // Fallback: try certutil for current user
-          execCommandSilent(`certutil -user -addstore -f "Root" "${winCertPath}"`);
+          execCommand(`certutil -user -addstore -f "Root" "${winCertPath}"`);
         } catch (error2) {
           // Last resort: try system-wide (requires admin) - will throw if fails
-          execCommandSilent(`certutil -addstore -f "Root" "${winCertPath}"`);
+          execCommand(`certutil -addstore -f "Root" "${winCertPath}"`);
         }
       }
       break;
