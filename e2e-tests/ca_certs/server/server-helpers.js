@@ -1,7 +1,7 @@
 const https = require('node:https');
 const fs = require('node:fs');
 const path = require('node:path');
-const { execCommand, detectPlatform } = require('./cert-helpers');
+const { execCommand, execCommandSilent, detectPlatform } = require('./cert-helpers');
 
 /**
  * Simple server helper functions
@@ -19,12 +19,12 @@ function killProcessOnPort(port) {
         execCommand(`fuser -k ${port}/tcp`);
         break;
       case 'windows':
-        const result = execCommand(`netstat -ano | findstr :${port}`);
+        const result = execCommandSilent(`netstat -ano | findstr :${port}`);
         const lines = result.toString().split('\n');
         for (const line of lines) {
           const match = line.trim().match(/\s+(\d+)$/);
           if (match) {
-            execCommand(`taskkill /F /PID ${match[1]}`);
+            execCommandSilent(`taskkill /F /PID ${match[1]}`);
           }
         }
         break;

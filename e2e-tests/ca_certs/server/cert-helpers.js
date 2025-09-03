@@ -15,6 +15,14 @@ function execCommand(command, cwd = process.cwd()) {
   });
 }
 
+function execCommandSilent(command, cwd = process.cwd()) {
+  return execSync(command, { 
+    cwd, 
+    stdio: 'pipe',
+    timeout: 30000 
+  });
+}
+
 function detectPlatform() {
   const platform = os.platform();
   switch (platform) {
@@ -37,7 +45,17 @@ function installOpenSSL() {
         execCommand('sudo apt-get update && sudo apt-get install -y openssl || sudo yum install -y openssl || sudo dnf install -y openssl');
         break;
       case 'windows':
-        execCommand('choco install openssl -y || winget install OpenSSL.Light');
+        try {
+          // Try chocolatey first (silent to avoid error output)
+          execCommandSilent('choco install openssl -y');
+        } catch (error1) {
+          try {
+            // Try winget as fallback
+            execCommandSilent('winget install ShiningLight.OpenSSL');
+          } catch (error2) {
+            console.warn('neither chocolatey nor winget found. please install openssl manually.');
+          }
+        }
         break;
     }
   } catch (error) {
@@ -120,7 +138,17 @@ function addCAToTruststore(caCertPath) {
         execCommand('sudo update-ca-certificates');
         break;
       case 'windows':
-        execCommand(`certlm.exe -addstore -f "Root" "${caCertPath}"`);
+        try {
+          // Use PowerShell to import certificate to Trusted Root store (silent)
+          execCommandSilent(`powershell -Command "Import-Certificate -FilePath '${caCertPath}' -CertStoreLocation Cert:\\LocalMachine\\Root"`);
+        } catch (error) {
+          try {
+            // Fallback: try certutil which is more widely available
+            execCommandSilent(`certutil -addstore -f "Root" "${caCertPath}"`);
+          } catch (error2) {
+            // Both methods failed, but don't throw - truststore is optional
+          }
+        }
         break;
     }
   } catch (error) {
@@ -146,6 +174,7 @@ module.exports = {
   addCAToTruststore,
   verifyCertificates,
   detectPlatform,
-  execCommand
+  execCommand,
+  execCommandSilent
 };
 
