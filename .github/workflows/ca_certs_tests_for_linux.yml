@@ -45,8 +45,12 @@ jobs:
         run: |
           set -euo pipefail
 
+          cd e2e-tests/ca_certs/server
+
+          node ./index.js
+
           # navigate to CA certificates test collection directory
-          cd e2e-tests/ca_certs/collection
+          cd ../collection
 
           echo "with ssl/tls disabled"
           # should pass
