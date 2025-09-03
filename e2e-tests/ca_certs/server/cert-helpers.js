@@ -36,6 +36,14 @@ function detectPlatform() {
 function installOpenSSL() {
   const platform = detectPlatform();
   
+  // Check if OpenSSL is already available
+  try {
+    execCommandSilent('openssl version');
+    return; // OpenSSL is already installed, no need to install
+  } catch (error) {
+    // OpenSSL not found, proceed with installation
+  }
+  
   try {
     switch (platform) {
       case 'macos':
