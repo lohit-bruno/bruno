@@ -119,8 +119,20 @@ IP.2 = ::1`;
   // Generate server certificate
   execCommand('openssl x509 -req -in localhost.csr -CA ca-cert.pem -CAkey ca-key.pem -CAcreateserial -out localhost-cert.pem -days 365 -extensions v3_req -extfile localhost.ext', certsDir);
   
-  // Set permissions
+  // Generate Windows-specific formats
   const platform = detectPlatform();
+  if (platform === 'windows') {
+    // Convert CA certificate to DER format for Windows truststore
+    execCommand('openssl x509 -in ca-cert.pem -outform DER -out ca-cert.der', certsDir);
+    
+    // Create P12 bundle for server certificate (includes both cert and key)
+    execCommand('openssl pkcs12 -export -out localhost.p12 -inkey localhost-key.pem -in localhost-cert.pem -certfile ca-cert.pem -password pass:', certsDir);
+    
+    // Convert server cert to DER as well
+    execCommand('openssl x509 -in localhost-cert.pem -outform DER -out localhost-cert.der', certsDir);
+  }
+  
+  // Set permissions
   if (platform !== 'windows') {
     execCommand('chmod 600 ca-key.pem localhost-key.pem', certsDir);
     execCommand('chmod 644 ca-cert.pem localhost-cert.pem', certsDir);
@@ -133,28 +145,33 @@ IP.2 = ::1`;
   });
 }
 
-function addCAToTruststore(caCertPath) {
+function addCAToTruststore(certsDir) {
   const platform = detectPlatform();
   
   try {
     switch (platform) {
       case 'macos':
-        execCommand(`sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "${caCertPath}"`);
+        const macCertPath = path.join(certsDir, 'ca-cert.pem');
+        execCommand(`sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "${macCertPath}"`);
         break;
       case 'linux':
-        execCommand(`sudo cp "${caCertPath}" /usr/local/share/ca-certificates/bruno-ca.crt`);
+        const linuxCertPath = path.join(certsDir, 'ca-cert.pem');
+        execCommand(`sudo cp "${linuxCertPath}" /usr/local/share/ca-certificates/bruno-ca.crt`);
         execCommand('sudo update-ca-certificates');
         break;
       case 'windows':
+        // Use DER format for Windows
+        const winCertPath = path.join(certsDir, 'ca-cert.der');
         try {
-          // Use PowerShell to import certificate to Trusted Root store (silent)
-          execCommandSilent(`powershell -Command "Import-Certificate -FilePath '${caCertPath}' -CertStoreLocation Cert:\\LocalMachine\\Root"`);
+          // Use PowerShell to import DER certificate to Trusted Root store
+          execCommandSilent(`powershell -Command "Import-Certificate -FilePath '${winCertPath}' -CertStoreLocation Cert:\\LocalMachine\\Root"`);
         } catch (error) {
           try {
-            // Fallback: try certutil which is more widely available
-            execCommandSilent(`certutil -addstore -f "Root" "${caCertPath}"`);
+            // Fallback: try certutil with DER format
+            execCommandSilent(`certutil -addstore -f "Root" "${winCertPath}"`);
           } catch (error2) {
             // Both methods failed, but don't throw - truststore is optional
+            throw error2;
           }
         }
         break;
@@ -165,7 +182,13 @@ function addCAToTruststore(caCertPath) {
 }
 
 function verifyCertificates(certsDir) {
+  const platform = detectPlatform();
   const requiredFiles = ['ca-cert.pem', 'ca-key.pem', 'localhost-cert.pem', 'localhost-key.pem'];
+  
+  // Add Windows-specific files
+  if (platform === 'windows') {
+    requiredFiles.push('ca-cert.der', 'localhost.p12', 'localhost-cert.der');
+  }
   
   for (const file of requiredFiles) {
     const filePath = path.join(certsDir, file);
@@ -175,12 +198,34 @@ function verifyCertificates(certsDir) {
   }
 }
 
+function getServerCertificateOptions(certsDir) {
+  const platform = detectPlatform();
+  
+  if (platform === 'windows') {
+    // Use P12 format for Windows (contains both cert and key)
+    const p12Path = path.join(certsDir, 'localhost.p12');
+    const p12Content = fs.readFileSync(p12Path);
+    
+    return {
+      pfx: p12Content,
+      passphrase: '' // empty password as set during creation
+    };
+  } else {
+    // Use PEM format for macOS and Linux
+    return {
+      key: fs.readFileSync(path.join(certsDir, 'localhost-key.pem')),
+      cert: fs.readFileSync(path.join(certsDir, 'localhost-cert.pem'))
+    };
+  }
+}
+
 module.exports = {
   installOpenSSL,
   createCertsDir,
   generateCertificates,
   addCAToTruststore,
   verifyCertificates,
+  getServerCertificateOptions,
   detectPlatform,
   execCommand,
   execCommandSilent

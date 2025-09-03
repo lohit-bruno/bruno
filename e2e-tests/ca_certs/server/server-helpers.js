@@ -1,7 +1,7 @@
 const https = require('node:https');
 const fs = require('node:fs');
 const path = require('node:path');
-const { execCommand, execCommandSilent, detectPlatform } = require('./cert-helpers');
+const { execCommand, execCommandSilent, detectPlatform, getServerCertificateOptions } = require('./cert-helpers');
 
 /**
  * Simple server helper functions
@@ -35,10 +35,7 @@ function killProcessOnPort(port) {
 }
 
 function createServer(certsDir, port = 8090) {
-  const serverOptions = {
-    key: fs.readFileSync(path.join(certsDir, 'localhost-key.pem')),
-    cert: fs.readFileSync(path.join(certsDir, 'localhost-cert.pem'))
-  };
+  const serverOptions = getServerCertificateOptions(certsDir);
 
   const server = https.createServer(serverOptions, (req, res) => {
     res.setHeader('Content-Type', 'text/html; charset=UTF-8');

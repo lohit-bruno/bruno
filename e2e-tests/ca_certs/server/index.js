@@ -40,7 +40,7 @@ const {
     verifyCertificates(certsDir);
 
     console.log('adding certificates to truststore!');
-    addCAToTruststore(path.join(certsDir, 'ca-cert.pem'));
+    addCAToTruststore(certsDir);
 
     // Start server
     killProcessOnPort(port);
