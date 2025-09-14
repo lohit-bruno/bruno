@@ -1,5 +1,6 @@
 import * as tls from 'node:tls';
 import * as fs from 'node:fs';
+import { executeCodeUsingFork } from './execute-code-using-fork';
 
 type T_CACertificatesOptions = {
   caCertFilePath?: string;
@@ -16,17 +17,30 @@ type T_CACertificatesResult = {
   };
 }
 
-let systemCertsCache: string[] | undefined;
+type T_SystemCertsCache = string[] | undefined;
 
-function getSystemCerts(): string[] {
+let systemCertsCache: T_SystemCertsCache;
+
+async function getSystemCerts(): Promise<string[]> {
   if (systemCertsCache) return systemCertsCache;
 
   try {
-    systemCertsCache = tls.getCACertificates('system');
+    systemCertsCache = await executeCodeUsingFork(`
+      const tls = require('node:tls');
+      try {
+        return tls.getCACertificates('system');
+      } catch (error) {
+        return [];
+      }
+    `).then(result => {
+      if (!result?.result || !Array.isArray(result.result)) {
+        return [];
+      }
+      return result.result;
+    });
 
-    return systemCertsCache;
+    return systemCertsCache || [];
   } catch (error) {
-    console.error(error);
     return [];
   }
 }
@@ -90,7 +104,7 @@ function getNodeExtraCACerts(): string[] {
  * @returns {T_CACertificatesResult} - CA certificates and their count
  */
 
-const getCACertificates = ({ caCertFilePath, shouldKeepDefaultCerts = true }: T_CACertificatesOptions): T_CACertificatesResult => {
+const getCACertificates = async ({ caCertFilePath, shouldKeepDefaultCerts = true }: T_CACertificatesOptions): Promise<T_CACertificatesResult> => {
   try {
     let caCertificates = '';
     let caCertificatesCount = {
@@ -126,7 +140,7 @@ const getCACertificates = ({ caCertFilePath, shouldKeepDefaultCerts = true }: T_
 
       if (shouldKeepDefaultCerts) {
         // get system certs
-        systemCerts = getSystemCerts();
+        systemCerts = await getSystemCerts();
         caCertificatesCount.system = systemCerts.length;
 
         // get root certs
@@ -135,7 +149,7 @@ const getCACertificates = ({ caCertFilePath, shouldKeepDefaultCerts = true }: T_
       }
     } else {
       // get system certs
-      systemCerts = getSystemCerts();
+      systemCerts = await getSystemCerts();
       caCertificatesCount.system = systemCerts.length;
 
       // get root certs
