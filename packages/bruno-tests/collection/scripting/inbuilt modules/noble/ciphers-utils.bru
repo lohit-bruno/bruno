@@ -1,0 +1,80 @@
+meta {
+  name: ciphers-utils
+  type: http
+  seq: 1
+}
+
+post {
+  url: https://echo.usebruno.com
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  const { doesUint8ArraysWorkAsExpected, isUint8Array, getRandomValuesFunction } = require('./scripting/inbuilt modules/utils.js');
+  
+  if (!doesUint8ArraysWorkAsExpected()) {
+    console.warn('Uint8Array does not work as expected in vm2');
+    // also noble library is not supported in vm2
+    return;
+  }
+  
+  test("should verify noble libraries are properly integrated", function() {
+    // Test that all noble modules can be imported without errors
+    const modules = [
+      '@noble/ciphers/aes',
+      '@noble/ciphers/chacha', 
+      '@noble/ciphers/salsa',
+      '@noble/ciphers/utils',
+      '@noble/hashes/sha2',
+      '@noble/hashes/hmac'
+    ];
+    
+    modules.forEach(moduleName => {
+      try {
+        const module = require(moduleName);
+        expect(module).to.not.be.undefined;
+      } catch (error) {
+        throw new Error(`Failed to import ${moduleName}: ${error.message}`);
+      }
+    });
+  });
+  
+  test("should use noble ciphers utils", function() {
+    const { randomBytes, managedNonce } = require('@noble/ciphers/utils');
+    
+    // Test randomBytes utility
+    const random32 = randomBytes(32);
+    expect(isUint8Array(random32)).to.be.true;
+    expect(random32.length).to.equal(32);
+    
+    const random16 = randomBytes(16);
+    expect(isUint8Array(random16)).to.be.true;
+    expect(random16.length).to.equal(16);
+    
+    // Ensure different calls produce different results
+    const random32_2 = randomBytes(32);
+    expect(Array.from(random32)).to.not.deep.equal(Array.from(random32_2));
+  });
+  
+  test("should work with crypto.getRandomValues", function() {
+    // Test that crypto.getRandomValues is available (provided by Bruno's crypto shim)
+    const buffer = new Uint8Array(16);
+    getRandomValuesFunction(buffer);
+    
+    expect(isUint8Array(buffer)).to.be.true;
+    expect(buffer.length).to.equal(16);
+    
+    // Check that it's not all zeros (extremely unlikely with proper randomness)
+    const allZeros = Array.from(buffer).every(byte => byte === 0);
+    expect(allZeros).to.be.false;
+  });
+}
+
+settings {
+  encodeUrl: true
+}

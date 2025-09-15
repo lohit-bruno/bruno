@@ -1,0 +1,34 @@
+meta {
+  name: textencoder
+  type: http
+  seq: 1
+}
+
+post {
+  url: https://echo.usebruno.com
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  const { getTextEncoder, isUint8Array } = require('./scripting/inbuilt modules/utils.js');
+  
+  test("should encode text to typedarray using TextEncoder", function() {
+    const encoder = getTextEncoder();
+    const encodedText = encoder.encode('text');
+    
+    const isEncodedTextOfTypeUint8Array = isUint8Array(encodedText);
+    expect(isEncodedTextOfTypeUint8Array).to.be.true;
+    
+    const plainArray = Array.from(encodedText);
+    expect(plainArray).to.eql([116, 101, 120, 116])
+  });
+}
+
+settings {
+  encodeUrl: true
+}

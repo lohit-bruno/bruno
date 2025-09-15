@@ -1,0 +1,60 @@
+meta {
+  name: hashes
+  type: http
+  seq: 5
+}
+
+post {
+  url: https://echo.usebruno.com
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  const { doesUint8ArraysWorkAsExpected, isUint8Array, getTextEncoder } = require('./scripting/inbuilt modules/utils.js');
+  
+  if (!doesUint8ArraysWorkAsExpected()) {
+    console.warn('Uint8Array does not work as expected in vm2');
+    // also noble library is not supported in vm2
+    return;
+  }
+  
+  test("should compute SHA-256 hash", function() {
+    const { sha256 } = require('@noble/hashes/sha2');
+    
+    const message = getTextEncoder().encode("Hello, Noble Hashes!");
+    const hash = sha256(message);
+    
+    expect(isUint8Array(hash)).to.be.true;
+    expect(hash.length).to.equal(32); // SHA-256 produces 32-byte hash
+    
+    // Convert to hex for verification
+    const hexHash = Array.from(hash)
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+    
+    expect(hexHash).to.be.a('string');
+    expect(hexHash.length).to.equal(64); // 32 bytes = 64 hex chars
+  });
+  
+  test("should compute HMAC-SHA256", function() {
+    const { hmac } = require('@noble/hashes/hmac');
+    const { sha256 } = require('@noble/hashes/sha2');
+    
+    const key = getTextEncoder().encode("secret-key");
+    const message = getTextEncoder().encode("message to authenticate");
+    
+    const mac = hmac(sha256, key, message);
+    
+    expect(isUint8Array(mac)).to.be.true;
+    expect(mac.length).to.equal(32); // HMAC-SHA256 produces 32-byte MAC
+  });
+}
+
+settings {
+  encodeUrl: true
+}

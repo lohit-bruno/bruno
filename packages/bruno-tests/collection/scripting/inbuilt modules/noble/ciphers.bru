@@ -1,0 +1,118 @@
+meta {
+  name: ciphers
+  type: http
+  seq: 1
+}
+
+post {
+  url: https://echo.usebruno.com
+  body: none
+  auth: inherit
+}
+
+assert {
+  res.status: eq 200
+}
+
+tests {
+  const { doesUint8ArraysWorkAsExpected, isUint8Array, getRandomValuesFunction, getTextEncoder, getTextDecoder } = require('./scripting/inbuilt modules/utils.js');
+  
+  if (!doesUint8ArraysWorkAsExpected()) {
+    console.warn('Uint8Array does not work as expected in vm2');
+    // also noble library is not supported in vm2
+    return;
+  }
+  
+  test("should encrypt and decrypt with AES-256-GCM", function() {
+    const { gcm } = require('@noble/ciphers/aes');
+    
+    // Test data
+    const key = new Uint8Array(32); // 256-bit key
+    getRandomValuesFunction(key);
+    
+    const plaintext = getTextEncoder().encode("Hello, Noble Ciphers!");
+    const nonce = new Uint8Array(12); // 96-bit nonce for GCM
+    getRandomValuesFunction(nonce);
+    
+    // Create cipher instance
+    const cipher = gcm(key, nonce);
+    
+    // Encrypt
+    const ciphertext = cipher.encrypt(plaintext);
+    expect(isUint8Array(ciphertext)).to.be.true;
+    expect(ciphertext.length).to.be.greaterThan(plaintext.length); // includes auth tag
+    
+    // Decrypt
+    const decrypted = cipher.decrypt(ciphertext);
+    expect(isUint8Array(decrypted)).to.be.true;
+    expect(decrypted.length).to.equal(plaintext.length);
+    
+    // Verify decryption
+    const decryptedText = getTextDecoder().decode(decrypted);
+    expect(decryptedText).to.equal("Hello, Noble Ciphers!");
+  });
+  
+  test("should encrypt and decrypt with ChaCha20-Poly1305", function() {
+    const { chacha20poly1305 } = require('@noble/ciphers/chacha');
+    
+    // Test data
+    const key = new Uint8Array(32); // 256-bit key
+    getRandomValuesFunction(key);
+    
+    const plaintext = getTextEncoder().encode("ChaCha20-Poly1305 test message");
+    const nonce = new Uint8Array(12); // 96-bit nonce
+    getRandomValuesFunction(nonce);
+    
+    // Create cipher instance
+    const cipher = chacha20poly1305(key, nonce);
+    
+    // Encrypt
+    const ciphertext = cipher.encrypt(plaintext);
+    expect(isUint8Array(ciphertext)).to.be.true;
+    expect(ciphertext.length).to.be.greaterThan(plaintext.length); // includes auth tag
+    
+    // Decrypt
+    const decrypted = cipher.decrypt(ciphertext);
+    expect(isUint8Array(decrypted)).to.be.true;
+    expect(decrypted.length).to.equal(plaintext.length);
+    
+    // Verify decryption
+    const decryptedText = getTextDecoder().decode(decrypted);
+    expect(decryptedText).to.equal("ChaCha20-Poly1305 test message");
+    
+    console.log("ChaCha20-Poly1305 test passed");
+  });
+  
+  test("should encrypt and decrypt with XSalsa20-Poly1305", function() {
+    const { xsalsa20poly1305 } = require('@noble/ciphers/salsa');
+    
+    // Test data
+    const key = new Uint8Array(32); // 256-bit key
+    getRandomValuesFunction(key);
+    
+    const plaintext = getTextEncoder().encode("XSalsa20-Poly1305 authenticated encryption");
+    const nonce = new Uint8Array(24); // 192-bit nonce for XSalsa20
+    getRandomValuesFunction(nonce);
+    
+    // Create cipher instance
+    const cipher = xsalsa20poly1305(key, nonce);
+    
+    // Encrypt
+    const ciphertext = cipher.encrypt(plaintext);
+    expect(isUint8Array(ciphertext)).to.be.true;
+    expect(ciphertext.length).to.be.greaterThan(plaintext.length); // includes auth tag
+    
+    // Decrypt
+    const decrypted = cipher.decrypt(ciphertext);
+    expect(isUint8Array(decrypted)).to.be.true;
+    expect(decrypted.length).to.equal(plaintext.length);
+    
+    // Verify decryption
+    const decryptedText = getTextDecoder().decode(decrypted);
+    expect(decryptedText).to.equal("XSalsa20-Poly1305 authenticated encryption");
+  });
+}
+
+settings {
+  encodeUrl: true
+}
