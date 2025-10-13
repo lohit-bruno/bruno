@@ -1,0 +1,26 @@
+name: 'Run Proxy CLI Tests - macOS'
+description: 'Run proxy CLI tests on macOS'
+runs:
+  using: 'composite'
+  steps:
+    - name: Run Proxy CLI tests
+      shell: bash
+      run: |
+        set -euo pipefail
+         
+        cd tests/proxy/system-proxy/collection
+
+        node ../../../../packages/bruno-cli/bin/bru.js run --reporter-json report.json
+        grep 'x-bruno-proxy-system' report.json || { 
+          echo "Test failed: Expected x-bruno-proxy-system header in response"
+          exit 1
+        }
+        echo "System proxy header found as expected"
+
+        node ../../../../packages/bruno-cli/bin/bru.js run --reporter-json report.json --noproxy
+        if grep 'x-bruno-proxy' report.json; then
+          echo "Test failed: Should not have any x-bruno-proxy header when using `--noproxy`"
+          exit 1
+        else
+          echo "No proxy header found as expected"
+        fi

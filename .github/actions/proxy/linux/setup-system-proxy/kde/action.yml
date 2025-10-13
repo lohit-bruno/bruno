@@ -1,0 +1,61 @@
+name: 'Setup System Proxy - Linux KDE'
+description: 'Configure KDE system proxy settings for proxy tests'
+runs:
+  using: 'composite'
+  steps:
+    - name: Configure KDE Proxy Settings
+      shell: bash
+      run: |
+        echo "Configuring KDE proxy settings..."
+        
+        # Method 1: Use kwriteconfig5 if available and D-Bus is set up
+        if command -v kwriteconfig5 >/dev/null 2>&1 && [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
+          echo "Using kwriteconfig5 to set proxy settings..."
+          kwriteconfig5 --group "Proxy Settings" --key "ProxyType" "1"
+          kwriteconfig5 --group "Proxy Settings" --key "httpProxy" "localhost:8091"
+          kwriteconfig5 --group "Proxy Settings" --key "httpsProxy" "localhost:8091"
+          kwriteconfig5 --group "Proxy Settings" --key "NoProxyFor" "*.local"
+          kwriteconfig5 --group "Proxy Settings" --key "AuthMode" "0"
+          kwriteconfig5 --group "Proxy Settings" --key "ReversedException" "false"
+          echo "✅ KDE proxy settings configured via kwriteconfig5"
+        else
+          # Method 2: Create config file directly
+          echo "Creating config file directly..."
+          {
+            echo "[Proxy Settings]"
+            echo "AuthMode=0"
+            echo "NoProxyFor=*.local"
+            echo "ProxyType=1"
+            echo "ReversedException=false"
+            echo "httpProxy=localhost:8091"
+            echo "httpsProxy=localhost:8091"
+          } > ~/.config/kioslaverc
+          
+          echo "✅ KDE proxy settings configured via direct file creation"
+        fi
+
+    - name: Verify KDE Proxy Configuration
+      shell: bash
+      run: |
+        echo "Verifying KDE proxy configuration..."
+        
+        # Show config file if it exists
+        if [ -f ~/.config/kioslaverc ]; then
+          echo "KDE Config File:"
+          cat ~/.config/kioslaverc
+        fi
+        
+        # Verify settings via kreadconfig5 if available
+        if command -v kreadconfig5 >/dev/null 2>&1 && [ -n "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
+          echo "KDE Proxy Settings (via kreadconfig5):"
+          echo "  HTTP Proxy: $(kreadconfig5 --group 'Proxy Settings' --key 'httpProxy' 2>/dev/null || echo 'not available')"
+          echo "  HTTPS Proxy: $(kreadconfig5 --group 'Proxy Settings' --key 'httpsProxy' 2>/dev/null || echo 'not available')"
+        fi
+        
+        # Verify correct proxy configuration
+        if [ -f ~/.config/kioslaverc ] && grep -q "httpProxy=localhost:8091" ~/.config/kioslaverc; then
+          echo "✅ KDE proxy configuration verified successfully"
+        else
+          echo "❌ KDE proxy configuration verification failed"
+          exit 1
+        fi

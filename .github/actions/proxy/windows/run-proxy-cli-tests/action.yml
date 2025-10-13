@@ -1,0 +1,27 @@
+name: 'Run Proxy CLI Tests - Windows'
+description: 'Run proxy CLI tests on Windows'
+runs:
+  using: 'composite'
+  steps:
+    - name: Run Proxy CLI tests
+      shell: pwsh
+      run: |
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = "Stop"
+        
+        Set-Location "tests/proxy/system-proxy/collection"
+
+        node ../../../../packages/bruno-cli/bin/bru.js run --reporter-json report.json
+        if (-not (Select-String -Path report.json -Pattern 'x-bruno-proxy-system' -Quiet)) {
+          Write-Host "Test failed: Expected x-bruno-proxy-system header in response"
+          exit 1
+        }
+        Write-Host "System proxy header found as expected"
+
+        node ../../../../packages/bruno-cli/bin/bru.js run --reporter-json report.json --noproxy
+        if (Select-String -Path report.json -Pattern 'x-bruno-proxy' -Quiet) {
+          Write-Host "Test failed: Should not have any x-bruno-proxy header when using `--noproxy`"
+          exit 1
+        } else {
+          Write-Host "No proxy header found as expected"
+        }

@@ -1,0 +1,51 @@
+name: 'Setup System Proxy - Linux Universal'
+description: 'Configure universal system proxy settings for proxy tests on Linux'
+runs:
+  using: 'composite'
+  steps:
+    - name: Configure System Proxy Settings
+      shell: bash
+      run: |
+        echo "Configuring universal system proxy settings..."
+        
+        # Configure environment file proxy
+        sudo tee -a /etc/environment > /dev/null << 'EOF'
+        HTTP_PROXY=http://localhost:8091
+        HTTPS_PROXY=http://localhost:8091
+        NO_PROXY=*.local
+        http_proxy=http://localhost:8091
+        https_proxy=http://localhost:8091
+        no_proxy=*.local
+        EOF
+        
+        # Configure systemd proxy
+        sudo mkdir -p /etc/systemd/system.conf.d
+        sudo tee /etc/systemd/system.conf.d/proxy.conf > /dev/null << 'EOF'
+        [Manager]
+        DefaultEnvironment="HTTP_PROXY=http://localhost:8091"
+        DefaultEnvironment="HTTPS_PROXY=http://localhost:8091"
+        DefaultEnvironment="NO_PROXY=*.local"
+        EOF
+        
+        echo "✅ Universal system proxy settings configured successfully"
+
+    - name: Verify System Proxy Configuration
+      shell: bash
+      run: |
+        echo "Verifying system proxy configuration..."
+        
+        # Verify environment file
+        if grep -q "http_proxy=http://localhost:8091" /etc/environment; then
+          echo "✅ Environment file proxy configuration verified"
+        else
+          echo "❌ Environment file proxy configuration failed"
+          exit 1
+        fi
+        
+        # Verify systemd configuration
+        if [ -f /etc/systemd/system.conf.d/proxy.conf ] && grep -q "HTTP_PROXY=http://localhost:8091" /etc/systemd/system.conf.d/proxy.conf; then
+          echo "✅ Systemd proxy configuration verified"
+        else
+          echo "❌ Systemd proxy configuration failed"
+          exit 1
+        fi

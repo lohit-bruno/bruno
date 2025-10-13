@@ -1,0 +1,44 @@
+name: 'Setup System Proxy - Linux GNOME'
+description: 'Configure GNOME system proxy settings for proxy tests'
+runs:
+  using: 'composite'
+  steps:
+    - name: Configure GNOME Proxy Settings
+      shell: bash
+      run: |
+        echo "Configuring GNOME proxy settings..."
+        
+        # Configure proxy settings via gsettings
+        gsettings set org.gnome.system.proxy mode 'manual'
+        gsettings set org.gnome.system.proxy.http host 'localhost'
+        gsettings set org.gnome.system.proxy.http port 8091
+        gsettings set org.gnome.system.proxy.https host 'localhost'
+        gsettings set org.gnome.system.proxy.https port 8091
+        gsettings set org.gnome.system.proxy ignore-hosts "['*.local']"
+        
+        echo "✅ GNOME proxy settings configured successfully"
+
+    - name: Verify GNOME Proxy Configuration
+      shell: bash
+      run: |
+        echo "Verifying GNOME proxy configuration..."
+        
+        echo "GNOME Proxy Settings:"
+        echo "  Mode: $(gsettings get org.gnome.system.proxy mode)"
+        echo "  HTTP Host: $(gsettings get org.gnome.system.proxy.http host)"
+        echo "  HTTP Port: $(gsettings get org.gnome.system.proxy.http port)"
+        echo "  HTTPS Host: $(gsettings get org.gnome.system.proxy.https host)"
+        echo "  HTTPS Port: $(gsettings get org.gnome.system.proxy.https port)"
+        echo "  Ignore Hosts: $(gsettings get org.gnome.system.proxy ignore-hosts)"
+        
+        # Verify the settings are correct
+        mode=$(gsettings get org.gnome.system.proxy mode)
+        http_host=$(gsettings get org.gnome.system.proxy.http host)
+        http_port=$(gsettings get org.gnome.system.proxy.http port)
+        
+        if [ "$mode" = "'manual'" ] && [ "$http_host" = "'localhost'" ] && [ "$http_port" = "8091" ]; then
+          echo "✅ GNOME proxy configuration verified successfully"
+        else
+          echo "❌ GNOME proxy configuration verification failed"
+          exit 1
+        fi

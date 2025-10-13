@@ -1,0 +1,79 @@
+name: 'Setup System Proxy - Windows'
+description: 'Configures Windows system proxy settings for testing'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Configure Proxy Scenario
+      shell: pwsh
+      run: |
+        # Clear any existing proxy settings first
+        try {
+          Remove-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings" -Name "ProxyEnable" -ErrorAction SilentlyContinue
+          Remove-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings" -Name "ProxyServer" -ErrorAction SilentlyContinue
+          Remove-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings" -Name "ProxyOverride" -ErrorAction SilentlyContinue
+          netsh winhttp reset proxy 2>$null
+        } catch {
+          Write-Host "Cleared existing settings"
+        }
+        
+        Write-Host "registry-protocol-specific"
+        Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings" -Name "ProxyEnable" -Value 1 -Type DWord
+        Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings" -Name "ProxyServer" -Value "http=localhost:8091;https=localhost:8091" -Type String
+        Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings" -Name "ProxyOverride" -Value "*.local" -Type String
+
+        Write-Host "system-env-proxy"
+        Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" -Name "HTTP_PROXY" -Value "http://localhost:8091" -Type String
+        Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" -Name "HTTPS_PROXY" -Value "http://localhost:8091" -Type String
+        Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" -Name "NO_PROXY" -Value "*.local" -Type String
+
+        Write-Host "winhttp-proxy"
+        Write-Host "Setting up WinHTTP proxy..."
+        netsh winhttp set proxy proxy-server="localhost:8091" bypass-list="*.local"
+        
+        Write-Host "user-environment"
+        Set-ItemProperty -Path "HKCU:\Environment" -Name "HTTP_PROXY" -Value "http://localhost:8091" -Type String
+        Set-ItemProperty -Path "HKCU:\Environment" -Name "HTTPS_PROXY" -Value "http://localhost:8091" -Type String
+        Set-ItemProperty -Path "HKCU:\Environment" -Name "NO_PROXY" -Value "*.local" -Type String
+        
+        Write-Host "Proxy scenario configured successfully"
+
+    - name: Verify Proxy Configuration Setup
+      shell: pwsh
+      run: |
+        Write-Host "Verifying proxy configuration setup..."
+        
+        # Check Internet Settings
+        try {
+          $regSettings = Get-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings" -ErrorAction SilentlyContinue
+          if ($regSettings) {
+            Write-Host "Internet Settings:"
+            Write-Host "  ProxyEnable: $($regSettings.ProxyEnable)"
+            Write-Host "  ProxyServer: $($regSettings.ProxyServer)"
+            Write-Host "  ProxyOverride: $($regSettings.ProxyOverride)"
+          }
+        } catch {
+          Write-Host "No Internet Settings found"
+        }
+        
+        # Check WinHTTP
+        try {
+          $winhttpOutput = netsh winhttp show proxy
+          Write-Host "WinHTTP Settings:"
+          Write-Host $winhttpOutput
+        } catch {
+          Write-Host "WinHTTP query failed"
+        }
+        
+        # Check Environment Variables
+        try {
+          $userEnv = Get-ItemProperty -Path "HKCU:\Environment" -ErrorAction SilentlyContinue
+          if ($userEnv) {
+            Write-Host "User Environment:"
+            Write-Host "  HTTP_PROXY: $($userEnv.HTTP_PROXY)"
+            Write-Host "  HTTPS_PROXY: $($userEnv.HTTPS_PROXY)"
+            Write-Host "  NO_PROXY: $($userEnv.NO_PROXY)"
+          }
+        } catch {
+          Write-Host "No user environment variables found"
+        }

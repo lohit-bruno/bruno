@@ -1,0 +1,161 @@
+name: Proxy Tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  tests-for-linux-common:
+    name: Proxy Tests - Linux Common
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      pull-requests: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node Dependencies
+        uses: ./.github/actions/common/setup-node-deps
+
+      - name: Setup Feature Dependencies
+        uses: ./.github/actions/proxy/linux/setup-feature-specific-deps
+
+      - name: Setup Test Server
+        uses: ./.github/actions/common/setup-server/linux
+
+      - name: Setup Proxy Server
+        uses: ./.github/actions/common/setup-proxy-server/linux
+
+      - name: Setup System Proxy
+        uses: ./.github/actions/proxy/linux/setup-system-proxy
+
+      - name: Run Proxy CLI Tests
+        uses: ./.github/actions/proxy/linux/run-proxy-cli-tests
+
+      - name: Run Proxy E2E Tests
+        uses: ./.github/actions/proxy/linux/run-proxy-e2e-tests
+
+  tests-for-linux-kde:
+    name: Proxy Tests - Linux Kde
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      pull-requests: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node Dependencies
+        uses: ./.github/actions/common/setup-node-deps
+
+      - name: Setup Feature Dependencies
+        uses: ./.github/actions/proxy/linux/setup-feature-specific-deps/kde
+
+      - name: Setup Test Server
+        uses: ./.github/actions/common/setup-server/linux
+
+      - name: Setup Proxy Server
+        uses: ./.github/actions/common/setup-proxy-server/linux
+
+      - name: Setup System Proxy
+        uses: ./.github/actions/proxy/linux/setup-system-proxy/kde
+
+      - name: Run Proxy CLI Tests
+        uses: ./.github/actions/proxy/linux/run-proxy-cli-tests
+
+      - name: Run Proxy E2E Tests
+        uses: ./.github/actions/proxy/linux/run-proxy-e2e-tests
+
+  tests-for-linux-gnome:
+    name: Proxy Tests - Linux Gnome
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
+      pull-requests: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node Dependencies
+        uses: ./.github/actions/common/setup-node-deps
+
+      - name: Setup Feature Dependencies
+        uses: ./.github/actions/proxy/linux/setup-feature-specific-deps/gnome
+
+      - name: Setup Test Server
+        uses: ./.github/actions/common/setup-server/linux
+
+      - name: Setup Proxy Server
+        uses: ./.github/actions/common/setup-proxy-server/linux
+
+      - name: Setup System Proxy
+        uses: ./.github/actions/proxy/linux/setup-system-proxy/gnome
+
+      - name: Run Proxy CLI Tests
+        uses: ./.github/actions/proxy/linux/run-proxy-cli-tests
+
+      - name: Run Proxy E2E Tests
+        uses: ./.github/actions/proxy/linux/run-proxy-e2e-tests
+
+  tests-for-macos:
+    name: Proxy Tests - macOS
+    timeout-minutes: 60
+    runs-on: macos-latest
+    permissions:
+      checks: write
+      pull-requests: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node Dependencies
+        uses: ./.github/actions/common/setup-node-deps
+
+      - name: Setup Test Server
+        uses: ./.github/actions/common/setup-server/macos
+
+      - name: Setup Proxy Server
+        uses: ./.github/actions/common/setup-proxy-server/macos
+
+      - name: Setup System Proxy
+        uses: ./.github/actions/proxy/macos/setup-system-proxy
+
+      - name: Run Proxy CLI Tests
+        uses: ./.github/actions/proxy/macos/run-proxy-cli-tests
+
+      - name: Run Proxy E2E Tests
+        uses: ./.github/actions/proxy/macos/run-proxy-e2e-tests
+
+  tests-for-windows:
+    name: Proxy Tests - Windows
+    timeout-minutes: 60
+    runs-on: windows-latest
+    permissions:
+      checks: write
+      pull-requests: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node Dependencies
+        uses: ./.github/actions/common/setup-node-deps
+
+      - name: Setup Test Server
+        uses: ./.github/actions/common/setup-server/windows
+
+      - name: Setup Proxy Server
+        uses: ./.github/actions/common/setup-proxy-server/windows
+
+      - name: Setup System Proxy
+        uses: ./.github/actions/proxy/windows/setup-system-proxy
+
+      - name: Run Proxy CLI Tests
+        uses: ./.github/actions/proxy/windows/run-proxy-cli-tests
+
+      - name: Run Proxy E2E Tests
+        uses: ./.github/actions/proxy/windows/run-proxy-e2e-tests

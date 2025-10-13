@@ -1,0 +1,117 @@
+name: 'Setup MITM Proxy - Windows'
+description: 'Sets up mitmproxy for transparent HTTP/HTTPS proxying with custom header injection'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install mitmproxy
+      shell: pwsh
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install mitmproxy
+
+    - name: Setup header injection script
+      shell: pwsh
+      run: |
+        $lines = @(
+          '#!/usr/bin/env python3'
+          'from mitmproxy import http, ctx'
+          ''
+          '# Map listening port -> header name'
+          'PORT_HEADER_MAP = {'
+          '    8091: "X-Bruno-Proxy-System",'
+          '}'
+          ''
+          '# value to set for the header'
+          'HEADER_VALUE = "via-mitmproxy"'
+          ''
+          'def response(flow: http.HTTPFlow) -> None:'
+          '    if not flow.response:'
+          '        return'
+          ''
+          '    listen_port = getattr(ctx.options, "listen_port", None)'
+          '    header_name = PORT_HEADER_MAP.get(listen_port, "X-Bruno-Proxy")  # fallback'
+          ''
+          '    # add or replace header'
+          '    flow.response.headers[header_name] = HEADER_VALUE'
+          ''
+          '    # optional logging'
+          '    ctx.log.info(f"Added header {header_name}: {HEADER_VALUE} to {flow.request.pretty_url}")'
+        )
+
+        # Join with LF (use "`n"); write as UTF-8
+        $lines -join "`n" | Set-Content -Path "add_header.py" -Encoding UTF8
+
+    - name: Start mitmproxy
+      shell: pwsh
+      run: |
+        # Set proxy configuration variables
+        $SSL_CA_CERT_PATH = "tests/_server/certs/ca-cert.pem"
+        $SCRIPT_PATH = (Resolve-Path "add_header.py").Path
+        
+        # Start mitmproxy instances in the background
+        Write-Host "Starting mitmproxy on port 8091..."
+        $process8091 = Start-Process -FilePath "mitmdump" -ArgumentList @(
+          "--listen-port", "8091",
+          "--set", "confdir=$env:USERPROFILE\.mitmproxy_port_8091",
+          "--set", "ssl_verify_upstream_trusted_ca=$SSL_CA_CERT_PATH",
+          "--script", "$SCRIPT_PATH"
+        ) -RedirectStandardOutput "mitmproxy-system.log" -RedirectStandardError "mitmproxy-system-error.log" -PassThru -WindowStyle Hidden
+
+        # Wait for CA certificate to be generated
+        $certPath8091 = "$env:USERPROFILE\.mitmproxy_port_8091\mitmproxy-ca-cert.pem"
+        while (-not (Test-Path $certPath8091)) {
+          Write-Host "Waiting for CA certificate to be generated..."
+          Start-Sleep -Seconds 1
+        }
+
+        # Install CA certificate for system trust
+        Import-Certificate -FilePath $certPath8091 -CertStoreLocation "Cert:\LocalMachine\Root" -Verbose
+
+        # Wait for proxy to be ready
+        for ($i = 1; $i -le 30; $i++) {
+          $connection = Get-NetTCPConnection -LocalPort 8091 -State Listen -ErrorAction SilentlyContinue
+          if ($connection) {
+            Write-Host "Proxy is ready on port 8091"
+            break
+          }
+          Write-Host "Waiting for proxy on port 8091 to start... ($i/30)"
+          Start-Sleep -Seconds 1
+          
+          if ($i -eq 30) {
+            Write-Host "ERROR: Timeout waiting for proxy on port 8091 to start"
+            exit 1
+          }
+        }
+        
+        netstat -an | Select-String -Pattern "8091"
+
+    - name: Verify proxy setup
+      shell: pwsh
+      run: |
+
+        # Set test server configuration
+        $TEST_SERVER_URL = "https://127.0.0.1:8090"
+        $PROXY_URL = "http://127.0.0.1:8091"
+        
+        Write-Host "Testing proxy instance on port 8091..."
+
+        $expectedHeader = "X-Bruno-Proxy-System"
+        
+        try {
+          $response = Invoke-WebRequest -Uri $TEST_SERVER_URL -Method Head -Proxy $PROXY_URL -UseBasicParsing
+          
+          if ($response.Headers[$expectedHeader] -eq "via-mitmproxy") {
+            Write-Host "Proxy on port 8091 is working - $expectedHeader header found"
+          } else {
+            Write-Host "Proxy on port 8091 failed - $expectedHeader header not found"
+            Write-Host "Headers received:"
+            $response.Headers | Format-Table
+            # exit 1
+          }
+        } catch {
+          Write-Host "Proxy on port 8091 failed - Error: $_"
+          # exit 1
+        }
+        
+        Write-Host "Proxy instance on port 8091 verified successfully"

@@ -1,0 +1,50 @@
+name: 'Setup System Proxy - macOS'
+description: 'Configure macOS system proxy settings for proxy tests'
+runs:
+  using: 'composite'
+  steps:
+    - name: Configure macOS Proxy Settings
+      shell: bash
+      run: |
+        echo "Configuring macOS proxy settings..."
+        
+        # Get the primary network service
+        PRIMARY_SERVICE=$(networksetup -listallnetworkservices | grep -v "^*" | head -n 2 | tail -n 1)
+        echo "Using network service: $PRIMARY_SERVICE"
+        
+        if [[ -n "$PRIMARY_SERVICE" ]]; then
+          # Configure HTTP and HTTPS proxy to localhost:8091
+          sudo networksetup -setwebproxy "$PRIMARY_SERVICE" localhost 8091
+          sudo networksetup -setsecurewebproxy "$PRIMARY_SERVICE" localhost 8091
+          sudo networksetup -setproxybypassdomains "$PRIMARY_SERVICE" "localhost" "127.0.0.1" "*.local"
+          
+          echo "macOS proxy settings configured successfully"
+        else
+          echo "Could not determine primary network service"
+          exit 1
+        fi
+
+    - name: Verify macOS Proxy Configuration
+      shell: bash
+      run: |
+        echo "Verifying macOS proxy configuration..."
+        
+        # Get the primary network service
+        PRIMARY_SERVICE=$(networksetup -listallnetworkservices | grep -v "^*" | head -n 2 | tail -n 1)
+        
+        if [[ -n "$PRIMARY_SERVICE" ]]; then
+          # Verify HTTP proxy settings
+          HTTP_PROXY=$(networksetup -getwebproxy "$PRIMARY_SERVICE" | grep "Server:" | awk '{print $2}')
+          HTTP_PORT=$(networksetup -getwebproxy "$PRIMARY_SERVICE" | grep "Port:" | awk '{print $2}')
+          
+          if [[ "$HTTP_PROXY" == "localhost" && "$HTTP_PORT" == "8091" ]]; then
+            echo "macOS proxy configuration verified successfully"
+          else
+            echo "macOS proxy configuration verification failed"
+            echo "Expected: localhost:8091, Got: $HTTP_PROXY:$HTTP_PORT"
+            exit 1
+          fi
+        else
+          echo "Could not verify proxy configuration"
+          exit 1
+        fi

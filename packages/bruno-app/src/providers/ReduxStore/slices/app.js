@@ -36,7 +36,7 @@ const initialState = {
   },
   cookies: [],
   taskQueue: [],
-  systemProxyEnvVariables: {}
+  systemProxyVariables: {}
 };
 
 export const appSlice = createSlice({
@@ -82,8 +82,8 @@ export const appSlice = createSlice({
     removeAllTasksFromQueue: (state) => {
       state.taskQueue = [];
     },
-    updateSystemProxyEnvVariables: (state, action) => {
-      state.systemProxyEnvVariables = action.payload;
+    updateSystemProxyVariables: (state, action) => {
+      state.systemProxyVariables = action.payload;
     },
     updateGenerateCode: (state, action) => {
       state.generateCode = {
@@ -111,7 +111,7 @@ export const {
   insertTaskIntoQueue,
   removeTaskFromQueue,
   removeAllTasksFromQueue,
-  updateSystemProxyEnvVariables,
+  updateSystemProxyVariables,
   updateGenerateCode,
   toggleSidebarCollapse
 } = appSlice.actions;
@@ -177,6 +177,17 @@ export const createCookieString = (cookieObj) => () => {
 export const completeQuitFlow = () => (dispatch, getState) => {
   const { ipcRenderer } = window;
   return ipcRenderer.invoke('main:complete-quit-flow');
+};
+
+export const getSystemProxyVariables = () => (dispatch, getState) => {
+  return new Promise((resolve, reject) => {
+    const { ipcRenderer } = window;
+    ipcRenderer.invoke('renderer:get-system-proxy-variables')
+      .then((variables) => {
+        dispatch(updateSystemProxyVariables(variables));
+      })
+      .then(resolve).catch(reject);
+  });
 };
 
 export default appSlice.reducer;

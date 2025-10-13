@@ -1,0 +1,41 @@
+name: 'Setup Proxy Feature Dependencies - Linux KDE'
+description: 'Setup KDE-specific dependencies for proxy tests on Linux'
+runs:
+  using: 'composite'
+  steps:
+    - name: Install dependencies and setup environment
+      shell: bash
+      run: |
+        # Install all required packages in one go
+        sudo apt-get update
+        sudo apt-get --no-install-recommends install -y \
+          libglib2.0-0 libnss3 libdbus-1-3 libatk1.0-0 libatk-bridge2.0-0 \
+          libcups2 libgtk-3-0 libasound2t64 xvfb dbus-x11
+
+        # Try to install KDE tools (graceful fallback)
+        {
+          sudo apt-get install -y kde-cli-tools && echo "✅ kde-cli-tools installed"
+        } || {
+          sudo apt-get install -y plasma-workspace && echo "✅ plasma-workspace installed"
+        } || {
+          echo "⚠️  KDE packages not available - will use direct file configuration"
+        }
+
+        # Setup display and D-Bus environment
+        export DISPLAY=:99
+        Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+        sleep 2
+
+        # Setup D-Bus session for KDE tools
+        if command -v kwriteconfig5 >/dev/null 2>&1; then
+          eval $(dbus-launch --sh-syntax)
+          export DBUS_SESSION_BUS_ADDRESS
+          echo "D-Bus session: $DBUS_SESSION_BUS_ADDRESS"
+        fi
+
+        # Create KDE config directories
+        mkdir -p ~/.config ~/.local/share/config ~/.kde/share/config
+
+        # Setup Electron sandbox permissions
+        sudo chown root /home/runner/work/bruno/bruno/node_modules/electron/dist/chrome-sandbox
+        sudo chmod 4755 /home/runner/work/bruno/bruno/node_modules/electron/dist/chrome-sandbox
