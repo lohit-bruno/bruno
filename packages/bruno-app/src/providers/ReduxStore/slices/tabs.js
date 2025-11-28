@@ -113,14 +113,14 @@ export const tabsSlice = createSlice({
     updateRequestPaneTabWidth: (state, action) => {
       const tab = find(state.tabs, (t) => t.uid === action.payload.uid);
 
-      if (tab) {
+      if (tab && (tab.requestPaneWidth !== action.payload.requestPaneWidth)) {
         tab.requestPaneWidth = action.payload.requestPaneWidth;
       }
     },
     updateRequestPaneTabHeight: (state, action) => {
       const tab = find(state.tabs, (t) => t.uid === action.payload.uid);
 
-      if (tab) {
+      if (tab && (tab.requestPaneHeight !== action.payload.requestPaneHeight)) {
         tab.requestPaneHeight = action.payload.requestPaneHeight;
       }
     },

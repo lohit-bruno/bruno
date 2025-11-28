@@ -72,12 +72,13 @@ const RequestTabPanel = () => {
   let collection = find(collections, (c) => c.uid === focusedTab?.collectionUid);
   const [dragging, setDragging] = useState(false);
   const dragOffset = useRef({ x: 0, y: 0 });
-  const { left: leftPaneWidth, top: topPaneHeight, reset: resetPaneBoundaries, setTop: setTopPaneHeight, setLeft: setLeftPaneWidth } = useTabPaneBoundaries(activeTabUid);
+  const mainSectionRef = useRef(null);
+
+  const { left: leftPaneWidth, top: topPaneHeight, reset: resetPaneBoundaries, setTop: setTopPaneHeight, setLeft: setLeftPaneWidth } = useTabPaneBoundaries({ activeTabUid, containerRef: mainSectionRef });
 
   // Not a recommended pattern here to have the child component
   // make a callback to set state, but treating this as an exception
   const docExplorerRef = useRef(null);
-  const mainSectionRef = useRef(null);
   const [schema, setSchema] = useState(null);
   const [showGqlDocs, setShowGqlDocs] = useState(false);
   const onSchemaLoad = (schema) => setSchema(schema);
