@@ -11,6 +11,7 @@ linux-test:
   image: node:20
   variables:
     DISPLAY: ":99"
+    ELECTRON_DISABLE_SANDBOX: "1"
   before_script:
     - apt-get update
     - apt-get install -y xvfb libnss3 libgtk-3-0 xdg-utils wget gnupg
@@ -19,6 +20,8 @@ linux-test:
     - echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list
     - apt-get update
     - apt-get install -y google-chrome-stable
+    # Create symlink so xdg-open can find Chrome
+    - ln -s /usr/bin/google-chrome-stable /usr/bin/chromium-browser
   script:
     # Start virtual display
     - Xvfb :99 -screen 0 1920x1080x24 &
@@ -35,12 +38,13 @@ linux-test:
     - npm run build --workspace=packages/bruno-requests
     - npm run build --workspace=packages/bruno-filestore
 
-    # Start Electron in dev mode
-    - npm run dev &
+    # Start Electron in dev mode with no-sandbox (required when running as root)
+    - cd packages/bruno-electron && npx electron . --no-sandbox &
     - ELECTRON_PID=$!
+    - cd ../..
     - sleep 5
 
-    # Trigger your custom URI
+    # Trigger your custom URI (will open in Chrome via xdg-open)
     - xdg-open "bruno://app/oauth2/callback"
     - sleep 5
 
