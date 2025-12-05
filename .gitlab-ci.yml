@@ -38,6 +38,8 @@ linux-test:
     - npm run build --workspace=packages/bruno-requests
     - npm run build --workspace=packages/bruno-filestore
 
+    - npm run build:web
+
     # Start Electron in dev mode with no-sandbox (required when running as root)
     - cd packages/bruno-electron && npx electron . --no-sandbox &
     - ELECTRON_PID=$!
