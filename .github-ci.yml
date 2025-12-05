@@ -1,0 +1,120 @@
+stages:
+  - prepare
+  - test
+
+# ───────────────────────────────────────────────
+# LINUX JOB (GitLab shared runner)
+# ───────────────────────────────────────────────
+
+linux-test:
+  stage: test
+  image: node:20
+  variables:
+    DISPLAY: ":99"
+  before_script:
+    - apt-get update
+    - apt-get install -y xvfb libnss3 libgtk-3-0 xdg-utils
+  script:
+    # Start virtual display
+    - Xvfb :99 -screen 0 1920x1080x24 &
+    - sleep 3
+
+    # Install dependencies
+    - npm ci --legacy-peer-deps
+
+    # Build libraries (YOUR STEPS)
+    - npm run build --workspace=packages/bruno-common
+    - npm run build --workspace=packages/bruno-query
+    - npm run sandbox:bundle-libraries --workspace=packages/bruno-js
+    - npm run build --workspace=packages/bruno-converters
+    - npm run build --workspace=packages/bruno-requests
+    - npm run build --workspace=packages/bruno-filestore
+
+    # Start Electron in dev mode
+    - npm run dev &
+    - ELECTRON_PID=$!
+    - sleep 5
+
+    # Trigger your custom URI
+    - xdg-open "bruno://app/oauth2/callback"
+    - sleep 5
+
+    # Stop Electron
+    - kill $ELECTRON_PID
+  artifacts:
+    expire_in: 1 week
+    paths:
+      - logs/
+  only:
+    - merge_requests
+    - main
+
+# ───────────────────────────────────────────────
+# MACOS JOB (requires a self-hosted Mac runner)
+# ───────────────────────────────────────────────
+
+macos-test:
+  stage: test
+  tags:
+    - macos
+  script:
+    # Install dependencies
+    - npm ci --legacy-peer-deps
+
+    # Build libraries (YOUR STEPS)
+    - npm run build --workspace=packages/bruno-common
+    - npm run build --workspace=packages/bruno-query
+    - npm run sandbox:bundle-libraries --workspace=packages/bruno-js
+    - npm run build --workspace=packages/bruno-converters
+    - npm run build --workspace=packages/bruno-requests
+    - npm run build --workspace=packages/bruno-filestore
+
+    # Start Electron in dev mode
+    - npm run dev &
+    - sleep 5
+
+    # Trigger custom URI
+    - open "bruno://app/oauth2/callback"
+    - sleep 5
+  artifacts:
+    expire_in: 1 week
+    paths:
+      - logs/
+  only:
+    - merge_requests
+    - main
+
+# ───────────────────────────────────────────────
+# WINDOWS JOB (requires a self-hosted Windows runner)
+# ───────────────────────────────────────────────
+
+windows-test:
+  stage: test
+  tags:
+    - windows
+  script:
+    # Install dependencies
+    - npm ci --legacy-peer-deps
+
+    # Build libraries (YOUR STEPS)
+    - npm run build --workspace=packages/bruno-common
+    - npm run build --workspace=packages/bruno-query
+    - npm run sandbox:bundle-libraries --workspace=packages/bruno-js
+    - npm run build --workspace=packages/bruno-converters
+    - npm run build --workspace=packages/bruno-requests
+    - npm run build --workspace=packages/bruno-filestore
+
+    # Start Electron in dev mode
+    - Start-Process "npm" "run dev"
+    - Start-Sleep -Seconds 5
+
+    # Trigger custom URI
+    - start "" "bruno://app/oauth2/callback"
+    - Start-Sleep -Seconds 5
+  artifacts:
+    expire_in: 1 week
+    paths:
+      - logs/
+  only:
+    - merge_requests
+    - main
