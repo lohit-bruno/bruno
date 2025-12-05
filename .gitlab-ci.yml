@@ -45,9 +45,6 @@ linux-test:
     expire_in: 1 week
     paths:
       - logs/
-  only:
-    - merge_requests
-    - main
 
 # ───────────────────────────────────────────────
 # MACOS JOB (requires a self-hosted Mac runner)
@@ -80,9 +77,6 @@ macos-test:
     expire_in: 1 week
     paths:
       - logs/
-  only:
-    - merge_requests
-    - main
 
 # ───────────────────────────────────────────────
 # WINDOWS JOB (requires a self-hosted Windows runner)
@@ -115,6 +109,3 @@ windows-test:
     expire_in: 1 week
     paths:
       - logs/
-  only:
-    - merge_requests
-    - main
