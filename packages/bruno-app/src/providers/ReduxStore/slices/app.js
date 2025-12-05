@@ -21,7 +21,11 @@ const initialState = {
       keepDefaultCaCertificates: {
         enabled: true
       },
-      timeout: 0
+      timeout: 0,
+      oauth2: {
+        useSystemBrowser: false,
+        callbackUrl: 'https://oauth2.usebruno.com'
+      }
     },
     font: {
       codeFont: 'default'

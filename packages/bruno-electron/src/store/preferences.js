@@ -20,7 +20,11 @@ const defaultPreferences = {
     },
     storeCookies: true,
     sendCookies: true,
-    timeout: 0
+    timeout: 0,
+    oauth2: {
+      useSystemBrowser: false,
+      callbackUrl: 'https://oauth2.usebruno.com'
+    }
   },
   font: {
     codeFont: 'default',
@@ -64,7 +68,22 @@ const preferencesSchema = Yup.object().shape({
     }),
     storeCookies: Yup.boolean(),
     sendCookies: Yup.boolean(),
-    timeout: Yup.number()
+    timeout: Yup.number(),
+    oauth2: Yup.object({
+      useSystemBrowser: Yup.boolean(),
+      callbackUrl: Yup.string()
+        .max(1024)
+        .test('isValidUrl', 'OAuth2 Callback URL must be a valid URL', (value) => {
+          if (!value) return true; // Allow empty
+          try {
+            const url = new URL(value);
+            // Must be http or https protocol
+            return url.protocol === 'http:' || url.protocol === 'https:';
+          } catch {
+            return false;
+          }
+        })
+    })
   }),
   font: Yup.object().shape({
     codeFont: Yup.string().nullable(),
@@ -172,6 +191,12 @@ const preferencesUtil = {
   },
   shouldSendCookies: () => {
     return get(getPreferences(), 'request.sendCookies', true);
+  },
+  shouldUseSystemBrowser: () => {
+    return get(getPreferences(), 'request.oauth2.useSystemBrowser', false);
+  },
+  getOAuth2CallbackUrl: () => {
+    return get(getPreferences(), 'request.oauth2.callbackUrl', 'https://oauth2.usebruno.com');
   },
   getResponsePaneOrientation: () => {
     return get(getPreferences(), 'layout.responsePaneOrientation', 'horizontal');

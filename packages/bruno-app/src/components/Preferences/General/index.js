@@ -37,6 +37,21 @@ const General = ({ close }) => {
       .test('isValidTimeout', 'Request Timeout must be equal or greater than 0', (value) => {
         return value === undefined || Number(value) >= 0;
       }),
+    oauth2: Yup.object({
+      useSystemBrowser: Yup.boolean(),
+      callbackUrl: Yup.string()
+        .max(1024)
+        .test('isValidUrl', 'OAuth2 Callback URL must be a valid URL', (value) => {
+          if (!value) return true; // Allow empty
+          try {
+            const url = new URL(value);
+            // Must be http or https protocol
+            return url.protocol === 'http:' || url.protocol === 'https:';
+          } catch {
+            return false;
+          }
+        })
+    }),
     defaultCollectionLocation: Yup.string().max(1024)
   });
 
@@ -53,6 +68,10 @@ const General = ({ close }) => {
       timeout: preferences.request.timeout,
       storeCookies: get(preferences, 'request.storeCookies', true),
       sendCookies: get(preferences, 'request.sendCookies', true),
+      oauth2: {
+        useSystemBrowser: get(preferences, 'request.oauth2.useSystemBrowser', false),
+        callbackUrl: get(preferences, 'request.oauth2.callbackUrl', 'https://oauth2.usebruno.com')
+      },
       defaultCollectionLocation: get(preferences, 'general.defaultCollectionLocation', '')
     },
     validationSchema: preferencesSchema,
@@ -81,7 +100,11 @@ const General = ({ close }) => {
           },
           timeout: newPreferences.timeout,
           storeCookies: newPreferences.storeCookies,
-          sendCookies: newPreferences.sendCookies
+          sendCookies: newPreferences.sendCookies,
+          oauth2: {
+            useSystemBrowser: newPreferences.oauth2.useSystemBrowser,
+            callbackUrl: newPreferences.oauth2.callbackUrl
+          }
         },
         general: {
           defaultCollectionLocation: newPreferences.defaultCollectionLocation
@@ -231,6 +254,45 @@ const General = ({ close }) => {
             Send Cookies automatically
           </label>
         </div>
+        <div className="h-[1px] bg-[#aaa5] w-full mt-6"></div>
+        <div className="mt-4 mb-2">
+          <h3 className="font-medium text-sm">OAuth2 Settings</h3>
+        </div>
+        <div className="flex items-center mt-2">
+          <input
+            id="oauth2.useSystemBrowser"
+            type="checkbox"
+            name="oauth2.useSystemBrowser"
+            checked={formik.values.oauth2.useSystemBrowser}
+            onChange={formik.handleChange}
+            className="mousetrap mr-0"
+          />
+          <label className="block ml-2 select-none" htmlFor="oauth2.useSystemBrowser">
+            Use System Browser for OAuth2 Authorization
+          </label>
+        </div>
+        <div className={`flex flex-col mt-4 ${formik?.values?.oauth2?.useSystemBrowser ? '' : 'opacity-50'}`}>
+          <input
+            type="text"
+            name="oauth2.callbackUrl"
+            className="block textbox w-full"
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck="false"
+            onChange={formik.handleChange}
+            value={formik.values.oauth2.callbackUrl}
+            placeholder="https://oauth2.usebruno.com"
+            disabled={!formik.values.oauth2.useSystemBrowser}
+          />
+          <div className="text-xs mt-1 opacity-50">
+            This callback URL will be used when "Use System Browser" is enabled
+          </div>
+        </div>
+        {formik.touched.oauth2?.callbackUrl && formik.errors.oauth2?.callbackUrl ? (
+          <div className="text-red-500 text-xs mt-1">{formik.errors.oauth2.callbackUrl}</div>
+        ) : null}
+        <div className="h-[1px] bg-[#aaa5] w-full mt-6"></div>
         <div className="flex flex-col mt-6">
           <label className="block select-none" htmlFor="timeout">
             Request Timeout (in ms)
