@@ -1,5 +1,6 @@
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
+const { execSync } = require('node:child_process');
 const isDev = require('electron-is-dev');
 const os = require('os');
 
@@ -90,7 +91,13 @@ if (isDev) {
   }
 
   // Now register this dev instance as the protocol handler
-  isCustomProtocolSet = app.setAsDefaultProtocolClient('bruno', process.execPath, [mainScriptPath]);
+  if (os.platform() !== 'linux') {
+    isCustomProtocolSet = app.setAsDefaultProtocolClient('bruno', process.execPath, [mainScriptPath]);
+  } else {
+    try {
+      execSync('xdg-mime default bruno.desktop x-scheme-handler/bruno');
+    } catch (err) {}
+  }
 } else {
   // In production, Electron will use the app's executable automatically
   isCustomProtocolSet = app.setAsDefaultProtocolClient('bruno');
