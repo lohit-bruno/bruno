@@ -1,0 +1,123 @@
+stages:
+  - prepare
+  - test
+
+# ───────────────────────────────────────────────
+# LINUX JOB (GitLab shared runner)
+# ───────────────────────────────────────────────
+
+linux-test:
+  stage: test
+  image: node:20
+  variables:
+    DISPLAY: ":99"
+    ELECTRON_DISABLE_SANDBOX: "1"
+  before_script:
+    - apt-get update
+    - apt-get install -y xvfb libnss3 libgtk-3-0 xdg-utils wget gnupg
+    # Install Chrome browser
+    - wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add -
+    - echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google-chrome.list
+    - apt-get update
+    - apt-get install -y google-chrome-stable
+    # Create symlink so xdg-open can find Chrome
+    - ln -s /usr/bin/google-chrome-stable /usr/bin/chromium-browser
+  script:
+    # Start virtual display
+    - Xvfb :99 -screen 0 1920x1080x24 &
+    - sleep 3
+
+    # Install dependencies
+    - npm ci --legacy-peer-deps
+
+    # Build libraries (YOUR STEPS)
+    - npm run build:graphql-docs
+    - npm run build:bruno-query
+    - npm run build:bruno-common
+    - npm run build:bruno-converters
+    - npm run build:bruno-requests
+    - npm run build:bruno-filestore
+    - npm run sandbox:bundle-libraries --workspace=packages/bruno-js
+
+    - npm run dev:web &
+
+    # Start Electron in dev mode with no-sandbox (required when running as root)
+    - cd packages/bruno-electron && npx electron . --no-sandbox &
+    - ELECTRON_PID=$!
+    - cd ../..
+    - sleep 5
+
+    # Trigger your custom URI (will open in Chrome via xdg-open)
+    - xdg-open "bruno://app/oauth2/callback"
+    - sleep 5
+
+    # Stop Electron
+    - kill $ELECTRON_PID
+  artifacts:
+    expire_in: 1 week
+    paths:
+      - logs/
+
+# ───────────────────────────────────────────────
+# MACOS JOB (requires a self-hosted Mac runner)
+# ───────────────────────────────────────────────
+
+macos-test:
+  stage: test
+  tags:
+    - macos
+  script:
+    # Install dependencies
+    - npm ci --legacy-peer-deps
+
+    # Build libraries (YOUR STEPS)
+    - npm run build --workspace=packages/bruno-common
+    - npm run build --workspace=packages/bruno-query
+    - npm run sandbox:bundle-libraries --workspace=packages/bruno-js
+    - npm run build --workspace=packages/bruno-converters
+    - npm run build --workspace=packages/bruno-requests
+    - npm run build --workspace=packages/bruno-filestore
+
+    # Start Electron in dev mode
+    - npm run dev &
+    - sleep 5
+
+    # Trigger custom URI
+    - open "bruno://app/oauth2/callback"
+    - sleep 5
+  artifacts:
+    expire_in: 1 week
+    paths:
+      - logs/
+
+# ───────────────────────────────────────────────
+# WINDOWS JOB (requires a self-hosted Windows runner)
+# ───────────────────────────────────────────────
+
+windows-test:
+  stage: test
+  tags:
+    - windows
+  script:
+    # Install dependencies
+    - npm ci --legacy-peer-deps
+
+    # Build libraries (YOUR STEPS)
+    - npm run build --workspace=packages/bruno-common
+    - npm run build --workspace=packages/bruno-query
+    - npm run sandbox:bundle-libraries --workspace=packages/bruno-js
+    - npm run build --workspace=packages/bruno-converters
+    - npm run build --workspace=packages/bruno-requests
+    - npm run build --workspace=packages/bruno-filestore
+
+    # Start Electron in dev mode
+    - Start-Process "npm" "run dev"
+    - Start-Sleep -Seconds 5
+
+    # Trigger custom URI
+    - start "" "bruno://app/oauth2/callback"
+    - Start-Sleep -Seconds 5
+  artifacts:
+    expire_in: 1 week
+    paths:
+      - logs/
