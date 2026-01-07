@@ -90,32 +90,64 @@ const isLinux = process.platform === 'linux';
 let mainWindow;
 let appProtocolUrl;
 
-// Register custom protocol handler (must be called before app is ready)
-// In dev mode, we need to pass the Electron executable path and script path
-app.setAsDefaultProtocolClient('bruno');
-if (os.platform() === 'linux') {
-  try {
-    execSync('xdg-mime default bruno.desktop x-scheme-handler/bruno');
-  } catch (err) {}
-}
+// Helper function to focus and restore the main window
+const focusMainWindow = () => {
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) {
+      mainWindow.restore();
+    }
+    mainWindow.focus();
+  }
+};
 
+// Parse protocol URL from command line arguments (if any)
 appProtocolUrl = getAppProtocolUrlFromArgv(process.argv);
 
-// Handle protocol URLs (macOS)
-if (process.platform === 'darwin') {
-  app.on('open-url', (event, url) => {
-    event.preventDefault();
-    appProtocolUrl = url || appProtocolUrl;
-    handleAppProtocolUrl(appProtocolUrl, mainWindow);
-  });
-}
+// Single instance lock - ensures only one instance of Bruno runs at a time
+const gotTheLock = app.requestSingleInstanceLock();
 
-// Handle protocol URLs when app is already running (Windows/Linux)
-if (process.platform === 'win32' || process.platform === 'linux') {
-  app.on('second-instance', (event, argv) => {
-    appProtocolUrl = getAppProtocolUrlFromArgv(argv) || appProtocolUrl;
-    handleAppProtocolUrl(appProtocolUrl, mainWindow);
-  });
+if (!gotTheLock) {
+  // Another instance is already running, quit immediately
+  app.quit();
+} else {
+  // This is the primary instance
+
+  // Try to remove any existing registrations
+  app.removeAsDefaultProtocolClient('bruno');
+  // Register as default handler for `bruno://` protocol URLs
+  app.setAsDefaultProtocolClient('bruno');
+
+  if (isLinux) {
+    try {
+      execSync('xdg-mime default bruno.desktop x-scheme-handler/bruno');
+    } catch (err) {}
+  }
+
+  // Handle protocol URLs for MacOS
+  if (isMac) {
+    app.on('open-url', (event, url) => {
+      event.preventDefault();
+      focusMainWindow();
+      if (url) {
+        appProtocolUrl = url;
+        handleAppProtocolUrl(appProtocolUrl, mainWindow);
+      }
+    });
+  }
+
+  // Handle protocol URLs for Windows/Linux
+  if (isWindows || isLinux) {
+    app.on('second-instance', (event, commandLine, workingDirectory) => {
+      focusMainWindow();
+
+      // Extract and handle protocol URL from the second instance attempt
+      const url = getAppProtocolUrlFromArgv(commandLine);
+      if (url) {
+        appProtocolUrl = url;
+        handleAppProtocolUrl(appProtocolUrl, mainWindow);
+      }
+    });
+  }
 }
 
 // Prepare the renderer once the app is ready
@@ -317,6 +349,11 @@ app.on('ready', async () => {
 
 // Quit the app once all windows are closed
 app.on('before-quit', () => {
+  // Release single instance lock to allow other instances to take over
+  if (gotTheLock) {
+    app.releaseSingleInstanceLock();
+  }
+
   try {
     cookiesStore.saveCookieJar(true);
   } catch (err) {
