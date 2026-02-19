@@ -97,6 +97,9 @@
       "conf": {
         "json-schema-typed": "8.0.1"
       }
+    },
+    "httpsnippet": {
+      "form-data": "4.0.5"
     }
   },
   "dependencies": {
