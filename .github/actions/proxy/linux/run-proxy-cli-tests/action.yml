@@ -1,0 +1,68 @@
+name: 'Run Proxy CLI Tests - Linux'
+description: 'Run proxy CLI tests on Linux'
+runs:
+  using: 'composite'
+  steps:
+    - name: Run collection-level no-proxy CLI tests
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        BRU="$(pwd)/packages/bruno-cli/bin/bru.js"
+        CERT_DIR="$(pwd)/tests/proxy/server/certs"
+
+        cd tests/proxy/fixtures/collection-no-proxy
+
+        echo "no proxy: run all requests (direct connection)"
+        # should pass — all 5 requests succeed without proxy
+        node "$BRU" run ./ --env prod --output junit1.xml --insecure --format junit
+        xmllint --xpath 'count(//testsuite[@errors="0"])' junit1.xml | grep -q "^4$" || exit 1
+
+        echo "no proxy: HTTPS request (direct, with cacert)"
+        # should pass — direct connection with custom CA cert
+        node "$BRU" run ./https.yml --env prod --output junit2.xml --cacert "$CERT_DIR/server.pem" --ignore-truststore --format junit
+        xmllint --xpath 'count(//testsuite[@errors="0"])' junit2.xml | grep -q "^1$" || exit 1
+
+    - name: Run collection-level HTTP proxy CLI tests
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        BRU="$(pwd)/packages/bruno-cli/bin/bru.js"
+        CERT_DIR="$(pwd)/tests/proxy/server/certs"
+
+        cd tests/proxy/fixtures/collection-http-proxy
+
+        echo "HTTP proxy: run all requests"
+        # should pass — all 5 requests through HTTP proxy (127.0.0.1:8090)
+        node "$BRU" run ./ --env prod --output junit.xml --cacert "$CERT_DIR/ca-bundle.pem" --format junit
+        xmllint --xpath 'count(//testsuite[@errors="0"])' junit.xml | grep -q "^4$" || exit 1
+
+    - name: Run collection-level HTTPS proxy CLI tests
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        BRU="$(pwd)/packages/bruno-cli/bin/bru.js"
+        CERT_DIR="$(pwd)/tests/proxy/server/certs"
+
+        cd tests/proxy/fixtures/collection-https-proxy
+
+        echo "HTTPS proxy: run all requests"
+        # should pass — all 5 requests through HTTPS proxy (127.0.0.1:8091)
+        node "$BRU" run ./ --env prod --output junit.xml --cacert "$CERT_DIR/ca-bundle.pem" --format junit
+        xmllint --xpath 'count(//testsuite[@errors="0"])' junit.xml | grep -q "^5$" || exit 1
+
+    - name: Run --noproxy flag CLI tests
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        BRU="$(pwd)/packages/bruno-cli/bin/bru.js"
+
+        cd tests/proxy/fixtures/collection-http-proxy
+
+        echo "--noproxy: run all requests bypassing collection proxy"
+        # should pass — --noproxy disables the collection-configured proxy, --insecure for self-signed cert
+        node "$BRU" run ./ --env prod --output junit.xml --noproxy --insecure --format junit
+        xmllint --xpath 'count(//testsuite[@errors="0"])' junit.xml | grep -q "^5$" || exit 1

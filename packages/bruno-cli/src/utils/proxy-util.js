@@ -65,7 +65,7 @@ const shouldUseProxy = (url, proxyBypass) => {
 /**
  * Options that should be forwarded from the constructor to the target TLS upgrade.
  */
-const TARGET_TLS_OPTIONS = ['cert', 'key', 'pfx', 'passphrase', 'rejectUnauthorized', 'secureContext'];
+const TARGET_TLS_OPTIONS = ['ca', 'cert', 'key', 'pfx', 'passphrase', 'rejectUnauthorized', 'secureContext'];
 
 /**
  * Patched version of HttpsProxyAgent that correctly handles TLS options for

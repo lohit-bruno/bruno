@@ -1,0 +1,4 @@
+name: local
+variables:
+  - name: host
+    value: host.docker.internal

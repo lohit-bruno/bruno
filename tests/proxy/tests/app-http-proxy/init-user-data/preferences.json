@@ -1,0 +1,33 @@
+{
+  "maximized": false,
+  "lastOpenedCollections": ["{{projectRoot}}/tests/proxy/fixtures/app-level-proxy"],
+  "preferences": {
+    "onboarding": {
+      "hasLaunchedBefore": true,
+      "hasSeenWelcomeModal": true
+    },
+    "request": {
+      "sslVerification": true,
+      "customCaCertificate": {
+        "enabled": true,
+        "filePath": "{{projectRoot}}/tests/proxy/server/certs/ca-bundle.pem"
+      },
+      "keepDefaultCaCertificates": {
+        "enabled": true
+      }
+    },
+    "proxy": {
+      "inherit": false,
+      "config": {
+        "protocol": "http",
+        "hostname": "127.0.0.1",
+        "port": 8090,
+        "auth": {
+          "username": "user",
+          "password": "password"
+        },
+        "bypassProxy": ""
+      }
+    }
+  }
+}

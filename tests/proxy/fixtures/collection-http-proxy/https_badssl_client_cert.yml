@@ -1,0 +1,21 @@
+info:
+  name: https_badssl_client_cert
+  type: http
+  seq: 5
+
+http:
+  method: GET
+  url: https://{{host}}:8072
+  auth: inherit
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

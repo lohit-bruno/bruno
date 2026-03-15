@@ -16,7 +16,7 @@ type CaCertificatesCount = {
 
 type AgentOptions = {
   rejectUnauthorized?: boolean;
-  ca?: string | string[] | Buffer | Buffer[];
+  ca?: string | string[];
   cert?: string | Buffer;
   key?: string | Buffer;
   pfx?: string | Buffer;

@@ -1,0 +1,87 @@
+name: 'Run Proxy CLI Tests - Windows'
+description: 'Run proxy CLI tests on Windows'
+runs:
+  using: 'composite'
+  steps:
+    - name: Run collection-level no-proxy CLI tests
+      shell: pwsh
+      run: |
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = "Stop"
+
+        $BRU = "$(Get-Location)\packages\bruno-cli\bin\bru.js"
+        $CERT_DIR = "$(Get-Location)\tests\proxy\server\certs"
+
+        Set-Location tests\proxy\fixtures\collection-no-proxy
+
+        Write-Host "no proxy: run all requests (direct connection)"
+        # should pass — all 5 requests succeed without proxy
+        node $BRU run ./ --env prod --output junit1.xml --insecure --format junit
+        if ($LASTEXITCODE -ne 0) { throw "CLI run failed" }
+        [xml]$xml = Get-Content junit1.xml
+        $count = ($xml.SelectNodes('//testsuite[@errors="0"]')).Count
+        if ($count -ne 4) { throw "Expected 4 passing testsuites, got $count" }
+
+        Write-Host "no proxy: HTTPS request (direct, with cacert)"
+        # should pass — direct connection with custom CA cert
+        node $BRU run ./https.yml --env prod --output junit2.xml --cacert "$CERT_DIR\server.pem" --ignore-truststore --format junit
+        if ($LASTEXITCODE -ne 0) { throw "CLI run failed" }
+        [xml]$xml2 = Get-Content junit2.xml
+        $count2 = ($xml2.SelectNodes('//testsuite[@errors="0"]')).Count
+        if ($count2 -ne 1) { throw "Expected 1 passing testsuite, got $count2" }
+
+    - name: Run collection-level HTTP proxy CLI tests
+      shell: pwsh
+      run: |
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = "Stop"
+
+        $BRU = "$(Get-Location)\packages\bruno-cli\bin\bru.js"
+        $CERT_DIR = "$(Get-Location)\tests\proxy\server\certs"
+
+        Set-Location tests\proxy\fixtures\collection-http-proxy
+
+        Write-Host "HTTP proxy: run all requests"
+        # should pass — all 5 requests through HTTP proxy (127.0.0.1:8090)
+        node $BRU run ./ --env prod --output junit.xml --cacert "$CERT_DIR\ca-bundle.pem" --format junit
+        if ($LASTEXITCODE -ne 0) { throw "CLI run failed" }
+        [xml]$xml = Get-Content junit.xml
+        $count = ($xml.SelectNodes('//testsuite[@errors="0"]')).Count
+        if ($count -ne 4) { throw "Expected 4 passing testsuites, got $count" }
+
+    - name: Run collection-level HTTPS proxy CLI tests
+      shell: pwsh
+      run: |
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = "Stop"
+
+        $BRU = "$(Get-Location)\packages\bruno-cli\bin\bru.js"
+        $CERT_DIR = "$(Get-Location)\tests\proxy\server\certs"
+
+        Set-Location tests\proxy\fixtures\collection-https-proxy
+
+        Write-Host "HTTPS proxy: run all requests"
+        # should pass — all 5 requests through HTTPS proxy (127.0.0.1:8091)
+        node $BRU run ./ --env prod --output junit.xml --cacert "$CERT_DIR\ca-bundle.pem" --format junit
+        if ($LASTEXITCODE -ne 0) { throw "CLI run failed" }
+        [xml]$xml = Get-Content junit.xml
+        $count = ($xml.SelectNodes('//testsuite[@errors="0"]')).Count
+        if ($count -ne 5) { throw "Expected 5 passing testsuites, got $count" }
+
+    - name: Run --noproxy flag CLI tests
+      shell: pwsh
+      run: |
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = "Stop"
+
+        $BRU = "$(Get-Location)\packages\bruno-cli\bin\bru.js"
+
+        Set-Location tests\proxy\fixtures\collection-http-proxy
+
+        Write-Host "--noproxy: run all requests bypassing collection proxy"
+        # should pass — --noproxy disables the collection-configured proxy, --insecure for self-signed cert
+        node $BRU run ./ --env prod --output junit.xml --noproxy --insecure --format junit
+        if ($LASTEXITCODE -ne 0) { throw "CLI run failed" }
+        [xml]$xml = Get-Content junit.xml
+        $count = ($xml.SelectNodes('//testsuite[@errors="0"]')).Count
+        if ($count -ne 5) { throw "Expected 5 passing testsuites, got $count" }

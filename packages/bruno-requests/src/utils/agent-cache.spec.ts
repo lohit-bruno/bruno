@@ -1,7 +1,8 @@
 import https from 'node:https';
 import http from 'node:http';
+import tls from 'node:tls';
 import { EventEmitter } from 'node:events';
-import { getOrCreateHttpsAgent, getOrCreateHttpAgent, clearAgentCache, getAgentCacheSize } from './agent-cache';
+import { getOrCreateHttpsAgent, getOrCreateHttpAgent, clearAgentCache, getAgentCacheSize, _applySecureContext, _buildSecureContext, _hashCaValue } from './agent-cache';
 
 describe('Agent Cache', () => {
   beforeEach(() => {
@@ -369,6 +370,186 @@ describe('Agent Cache', () => {
       expect(timeline2.some((e) => e.message.includes('Connected to test.com'))).toBe(false);
 
       jest.restoreAllMocks();
+    });
+  });
+
+  // Use a real root cert for tests that call addCACert (requires valid PEM)
+  const realCert = tls.rootCertificates[0];
+
+  describe('hashCaValue', () => {
+    it('returns null for undefined', () => {
+      expect(_hashCaValue(undefined)).toBeNull();
+    });
+
+    it('returns null for empty string', () => {
+      expect(_hashCaValue('')).toBeNull();
+    });
+
+    it('returns 16-char hex hash for a string', () => {
+      const hash = _hashCaValue('test-cert');
+      expect(hash).toHaveLength(16);
+      expect(hash).toMatch(/^[0-9a-f]{16}$/);
+    });
+
+    it('returns same hash for same string input', () => {
+      expect(_hashCaValue('cert-a')).toBe(_hashCaValue('cert-a'));
+    });
+
+    it('returns different hash for different input', () => {
+      expect(_hashCaValue('cert-a')).not.toBe(_hashCaValue('cert-b'));
+    });
+  });
+
+  describe('buildSecureContext', () => {
+    it('returns a SecureContext', () => {
+      const ctx = _buildSecureContext(realCert);
+      expect(ctx).toBeDefined();
+      expect(ctx.context).toBeDefined();
+    });
+
+    it('returns cached context for same CA value', () => {
+      const ctx1 = _buildSecureContext(realCert);
+      const ctx2 = _buildSecureContext(realCert);
+      expect(ctx1).toBe(ctx2);
+    });
+
+    it('returns different context for different CA values', () => {
+      // Use two different root certs
+      const cert1 = tls.rootCertificates[0];
+      const cert2 = tls.rootCertificates[1];
+      const ctx1 = _buildSecureContext(cert1);
+      const ctx2 = _buildSecureContext(cert2);
+      expect(ctx1).not.toBe(ctx2);
+    });
+
+    it('handles empty string ca without throwing', () => {
+      expect(() => _buildSecureContext('')).not.toThrow();
+    });
+  });
+
+  describe('applySecureContext', () => {
+    it('returns options unchanged when ca is not present', () => {
+      const options = { rejectUnauthorized: true, keepAlive: true };
+      const result = _applySecureContext(options);
+      expect(result).toEqual(options);
+    });
+
+    it('returns options unchanged when ca is falsy', () => {
+      const options = { ca: undefined, rejectUnauthorized: true } as any;
+      const result = _applySecureContext(options);
+      expect(result).toEqual(options);
+    });
+
+    it('returns options unchanged when ca is empty string', () => {
+      const options = { ca: '', rejectUnauthorized: true } as any;
+      const result = _applySecureContext(options);
+      expect(result).toEqual(options);
+    });
+
+    it('replaces ca with secureContext when ca is a valid cert string', () => {
+      const options = { ca: realCert, rejectUnauthorized: true };
+      const result = _applySecureContext(options) as any;
+
+      expect(result.ca).toBeUndefined();
+      expect(result.secureContext).toBeDefined();
+      expect(result.rejectUnauthorized).toBe(true);
+    });
+
+    it('strips pfx/cert/key/passphrase and sets secureContext when client cert + ca', () => {
+      const fakeCtx = { context: { addCACert: jest.fn() } };
+      const spy = jest.spyOn(tls, 'createSecureContext').mockReturnValueOnce(fakeCtx as any);
+
+      const options = {
+        ca: realCert,
+        cert: Buffer.from('client-cert'),
+        key: Buffer.from('client-key'),
+        passphrase: 'secret',
+        rejectUnauthorized: true
+      };
+      const result = _applySecureContext(options) as any;
+
+      expect(result.secureContext).toBe(fakeCtx);
+      expect(result.ca).toBeUndefined();
+      expect(result.cert).toBeUndefined();
+      expect(result.key).toBeUndefined();
+      expect(result.passphrase).toBeUndefined();
+      expect(result.rejectUnauthorized).toBe(true);
+      // createSecureContext called with client cert options
+      expect(spy).toHaveBeenCalledWith(expect.objectContaining({
+        cert: options.cert,
+        key: options.key,
+        passphrase: 'secret'
+      }));
+
+      spy.mockRestore();
+    });
+
+    it('strips pfx and sets secureContext when pfx + ca', () => {
+      const fakeCtx = { context: { addCACert: jest.fn() } };
+      const spy = jest.spyOn(tls, 'createSecureContext').mockReturnValueOnce(fakeCtx as any);
+
+      const options = {
+        ca: realCert,
+        pfx: Buffer.from('pfx-data'),
+        passphrase: 'secret',
+        rejectUnauthorized: false
+      };
+      const result = _applySecureContext(options) as any;
+
+      expect(result.secureContext).toBe(fakeCtx);
+      expect(result.ca).toBeUndefined();
+      expect(result.pfx).toBeUndefined();
+      expect(result.passphrase).toBeUndefined();
+      expect(result.rejectUnauthorized).toBe(false);
+      expect(spy).toHaveBeenCalledWith(expect.objectContaining({
+        pfx: options.pfx,
+        passphrase: 'secret'
+      }));
+
+      spy.mockRestore();
+    });
+
+    it('preserves non-TLS options', () => {
+      const options = {
+        ca: realCert,
+        rejectUnauthorized: true,
+        keepAlive: true,
+        minVersion: 'TLSv1.2'
+      } as any;
+      const result = _applySecureContext(options);
+
+      expect(result.keepAlive).toBe(true);
+      expect(result.minVersion).toBe('TLSv1.2');
+    });
+
+    it('uses cached buildSecureContext for CA-only (no client cert)', () => {
+      const options1 = { ca: realCert, rejectUnauthorized: true };
+      const options2 = { ca: realCert, rejectUnauthorized: false };
+      const result1 = _applySecureContext(options1) as any;
+      const result2 = _applySecureContext(options2) as any;
+
+      // Same CA → same cached secureContext object
+      expect(result1.secureContext).toBe(result2.secureContext);
+    });
+
+    it('does NOT cache secureContext when client certs are present', () => {
+      const fakeCtx1 = { context: { addCACert: jest.fn() } };
+      const fakeCtx2 = { context: { addCACert: jest.fn() } };
+      const spy = jest.spyOn(tls, 'createSecureContext')
+        .mockReturnValueOnce(fakeCtx1 as any)
+        .mockReturnValueOnce(fakeCtx2 as any);
+
+      const options1 = { ca: realCert, cert: Buffer.from('a'), key: Buffer.from('a') };
+      const options2 = { ca: realCert, cert: Buffer.from('b'), key: Buffer.from('b') };
+      const result1 = _applySecureContext(options1) as any;
+      const result2 = _applySecureContext(options2) as any;
+
+      // Different client certs → different secureContext (not cached)
+      expect(result1.secureContext).toBe(fakeCtx1);
+      expect(result2.secureContext).toBe(fakeCtx2);
+      expect(result1.secureContext).not.toBe(result2.secureContext);
+
+      spy.mockRestore();
     });
   });
 });

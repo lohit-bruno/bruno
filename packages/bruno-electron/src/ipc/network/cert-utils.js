@@ -40,13 +40,15 @@ const getCertsAndProxyConfig = async ({
       shouldKeepDefaultCerts: preferencesUtil.shouldKeepDefaultCaCertificates()
     });
 
+    console.log({ caCertificates: caCertificatesData.caCertificates.length });
+
     caCertificates = caCertificatesData.caCertificates;
     caCertificatesCount = caCertificatesData.caCertificatesCount;
   }
 
   // configure HTTPS agent with aggregated CA certificates
   httpsAgentRequestFields['caCertificatesCount'] = caCertificatesCount;
-  httpsAgentRequestFields['ca'] = caCertificates || [];
+  httpsAgentRequestFields['ca'] = caCertificates;
 
   const { promptVariables } = collection;
   const collectionVariables = request.collectionVariables || {};

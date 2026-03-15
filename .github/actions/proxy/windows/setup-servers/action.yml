@@ -1,0 +1,238 @@
+name: 'Setup Proxy Test Servers - Windows'
+description: 'Generate certs and start HTTP, HTTPS, and Squid proxy servers for proxy tests on Windows'
+runs:
+  using: 'composite'
+  steps:
+    - name: Install Squid
+      shell: pwsh
+      run: |
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = "Stop"
+        choco install squid --no-progress -y
+
+    - name: Generate HTTPS server certificate
+      shell: bash
+      run: |
+        set -euo pipefail
+        CERT_DIR="$(pwd)/tests/proxy/server/certs"
+        mkdir -p "$CERT_DIR"
+
+        openssl req -x509 -newkey rsa:2048 \
+          -keyout "$CERT_DIR/server.key" \
+          -out "$CERT_DIR/server.crt" \
+          -days 3650 -nodes \
+          -subj "/CN=localhost" \
+          -addext "subjectAltName=IP:127.0.0.1,DNS:localhost" 2>/dev/null
+
+        openssl x509 -in "$CERT_DIR/server.crt" -out "$CERT_DIR/server.pem" -outform PEM
+        echo "HTTPS server cert written to $CERT_DIR"
+
+    - name: Generate Squid proxy certificate
+      shell: bash
+      run: |
+        set -euo pipefail
+        SQUID_CERT_DIR="$(pwd)/tests/proxy/squid/certs"
+        mkdir -p "$SQUID_CERT_DIR"
+
+        openssl req -x509 -newkey rsa:2048 \
+          -keyout "$SQUID_CERT_DIR/squid.key" \
+          -out "$SQUID_CERT_DIR/squid.crt" \
+          -days 3650 -nodes \
+          -subj "/CN=squid-proxy" \
+          -addext "subjectAltName=IP:127.0.0.1,DNS:localhost" 2>/dev/null
+
+        # Squid https_port expects key + cert in a single PEM file
+        cat "$SQUID_CERT_DIR/squid.key" "$SQUID_CERT_DIR/squid.crt" > "$SQUID_CERT_DIR/squid.pem"
+        echo "Squid cert written to $SQUID_CERT_DIR"
+
+    - name: Generate client certificate for mTLS tests
+      shell: bash
+      run: |
+        set -euo pipefail
+        CERT_DIR="$(pwd)/tests/proxy/server/certs"
+        mkdir -p "$CERT_DIR"
+
+        # Client CA
+        openssl req -x509 -newkey rsa:2048 \
+          -keyout "$CERT_DIR/client-ca.key" \
+          -out "$CERT_DIR/client-ca.crt" \
+          -days 3650 -nodes \
+          -subj "/CN=Bruno Test Client CA" 2>/dev/null
+
+        # Client cert signed by client CA
+        openssl req -newkey rsa:2048 \
+          -keyout "$CERT_DIR/client.key" \
+          -out "$CERT_DIR/client.csr" \
+          -nodes -subj "/CN=Bruno Test Client" 2>/dev/null
+
+        openssl x509 -req \
+          -in "$CERT_DIR/client.csr" \
+          -CA "$CERT_DIR/client-ca.crt" \
+          -CAkey "$CERT_DIR/client-ca.key" \
+          -CAcreateserial \
+          -out "$CERT_DIR/client.crt" \
+          -days 3650 2>/dev/null
+
+        # PKCS12 bundle for Bruno client cert config
+        openssl pkcs12 -export \
+          -out "$CERT_DIR/client.p12" \
+          -inkey "$CERT_DIR/client.key" \
+          -in "$CERT_DIR/client.crt" \
+          -certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -macalg sha1 \
+          -passout pass:bruno-test
+
+        # Empty CA cert file (needed by ca=[] regression test)
+        touch "$CERT_DIR/empty-ca.pem"
+
+        echo "Client cert written to $CERT_DIR"
+
+    - name: Start HTTP server
+      shell: pwsh
+      run: |
+        Set-StrictMode -Version Latest
+        Start-Process -FilePath "node" -ArgumentList "tests\proxy\server\http-server.js" -NoNewWindow -PassThru
+        Write-Host "HTTP server started"
+
+    - name: Start HTTPS server
+      shell: pwsh
+      run: |
+        Set-StrictMode -Version Latest
+        $certDir = "$(Get-Location)\tests\proxy\server\certs"
+        $env:CERT_DIR = $certDir
+        Start-Process -FilePath "node" -ArgumentList "tests\proxy\server\https-server.js" `
+          -NoNewWindow -PassThru `
+          -Environment @{ CERT_DIR = $certDir }
+        Write-Host "HTTPS server started (CERT_DIR=$certDir)"
+
+    - name: Start HTTPS client-cert server
+      shell: pwsh
+      run: |
+        Set-StrictMode -Version Latest
+        $certDir = "$(Get-Location)\tests\proxy\server\certs"
+        $env:CERT_DIR = $certDir
+        Start-Process -FilePath "node" -ArgumentList "tests\proxy\server\https-client-cert-server.js" `
+          -NoNewWindow -PassThru `
+          -Environment @{ CERT_DIR = $certDir }
+        Write-Host "HTTPS client-cert server started (CERT_DIR=$certDir)"
+
+    - name: Create Squid htpasswd and config
+      shell: pwsh
+      run: |
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = "Stop"
+
+        # Create htpasswd for basic auth
+        # On Windows with choco-installed Squid, htpasswd may not be available
+        # Generate it manually using openssl
+        $htpasswdDir = "C:\Squid\etc"
+        if (!(Test-Path $htpasswdDir)) { New-Item -ItemType Directory -Path $htpasswdDir -Force }
+        $hash = & openssl passwd -apr1 "password"
+        "user:$hash" | Set-Content "$htpasswdDir\htpasswd"
+        Write-Host "htpasswd created at $htpasswdDir\htpasswd"
+
+        # Find basic_ncsa_auth
+        $ncsa = Get-ChildItem -Path "C:\", "C:\ProgramData\chocolatey" -Recurse -Filter "basic_ncsa_auth*" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if (!$ncsa) {
+          # Try common Squid install paths
+          $ncsa = Get-ChildItem -Path "C:\Squid" -Recurse -Filter "basic_ncsa_auth*" -ErrorAction SilentlyContinue | Select-Object -First 1
+        }
+        $ncsaPath = if ($ncsa) { $ncsa.FullName -replace '\\', '/' } else { "/usr/lib/squid/basic_ncsa_auth" }
+        Write-Host "Found basic_ncsa_auth at: $ncsaPath"
+
+        $squidCert = "$(Get-Location)\tests\proxy\squid\certs\squid.pem" -replace '\\', '/'
+        $squidConf = "$env:TEMP\squid-bruno.conf"
+        $htpasswdPath = "$htpasswdDir\htpasswd" -replace '\\', '/'
+
+        # Replace placeholders in squid.conf
+        (Get-Content tests\proxy\server\squid.conf) `
+          -replace '@SQUID_CERT@', $squidCert `
+          -replace '/usr/lib/squid/basic_ncsa_auth', $ncsaPath `
+          -replace '/etc/squid/htpasswd', $htpasswdPath |
+          Set-Content $squidConf
+
+        Write-Host "Squid config written to $squidConf"
+
+    - name: Start Squid proxy
+      shell: pwsh
+      run: |
+        Set-StrictMode -Version Latest
+        Start-Process -FilePath "squid" -ArgumentList "-N -f `"$env:TEMP\squid-bruno.conf`"" -NoNewWindow -PassThru
+        Write-Host "Squid started"
+
+    - name: Wait for HTTP server
+      shell: pwsh
+      run: |
+        Write-Host "Waiting for HTTP server on :8070..."
+        for ($i = 1; $i -le 30; $i++) {
+          try {
+            $r = Invoke-WebRequest -Uri http://localhost:8070/ -UseBasicParsing -TimeoutSec 2
+            if ($r.StatusCode -eq 200) { Write-Host "HTTP server ready"; exit 0 }
+          } catch {}
+          Start-Sleep 2
+        }
+        Write-Error "HTTP server did not become ready"
+
+    - name: Wait for HTTPS server
+      shell: pwsh
+      run: |
+        $certDir = "$(Get-Location)\tests\proxy\server\certs"
+        Write-Host "Waiting for HTTPS server on :8071..."
+        for ($i = 1; $i -le 30; $i++) {
+          $result = curl.exe -sf --cacert "$certDir\server.pem" https://localhost:8071/ 2>$null
+          if ($LASTEXITCODE -eq 0) { Write-Host "HTTPS server ready"; exit 0 }
+          Start-Sleep 2
+        }
+        Write-Error "HTTPS server did not become ready"
+
+    - name: Wait for HTTPS client-cert server
+      shell: pwsh
+      run: |
+        $certDir = "$(Get-Location)\tests\proxy\server\certs"
+        Write-Host "Waiting for HTTPS client-cert server on :8072..."
+        for ($i = 1; $i -le 30; $i++) {
+          $result = curl.exe -sf --cacert "$certDir\server.pem" `
+            --cert "$certDir\client.crt" --key "$certDir\client.key" `
+            https://localhost:8072/ 2>$null
+          if ($LASTEXITCODE -eq 0) { Write-Host "HTTPS client-cert server ready"; exit 0 }
+          Start-Sleep 2
+        }
+        Write-Error "HTTPS client-cert server did not become ready"
+
+    - name: Wait for Squid HTTP proxy
+      shell: pwsh
+      run: |
+        Write-Host "Waiting for Squid HTTP proxy on :8090..."
+        for ($i = 1; $i -le 30; $i++) {
+          $result = curl.exe -sf --proxy http://127.0.0.1:8090 http://localhost:8070/ 2>$null
+          if ($LASTEXITCODE -eq 0) { Write-Host "Squid HTTP proxy ready"; exit 0 }
+          Start-Sleep 2
+        }
+        Write-Error "Squid HTTP proxy did not become ready"
+
+    - name: Wait for Squid HTTPS proxy
+      shell: pwsh
+      run: |
+        $squidCertDir = "$(Get-Location)\tests\proxy\squid\certs"
+        Write-Host "Waiting for Squid HTTPS proxy on :8091..."
+        for ($i = 1; $i -le 30; $i++) {
+          $result = curl.exe -sf `
+            --proxy https://127.0.0.1:8091 `
+            --proxy-cacert "$squidCertDir\squid.pem" `
+            http://localhost:8070/ 2>$null
+          if ($LASTEXITCODE -eq 0) { Write-Host "Squid HTTPS proxy ready"; exit 0 }
+          Start-Sleep 2
+        }
+        Write-Error "Squid HTTPS proxy did not become ready"
+
+    - name: Create CA bundle (server + squid proxy certs)
+      shell: bash
+      run: |
+        set -euo pipefail
+        CERT_DIR="$(pwd)/tests/proxy/server/certs"
+        SQUID_CERT_DIR="$(pwd)/tests/proxy/squid/certs"
+        BUNDLE="$CERT_DIR/ca-bundle.pem"
+
+        # Combine HTTPS server cert and Squid proxy cert into a single CA bundle
+        cat "$CERT_DIR/server.pem" > "$BUNDLE"
+        cat "$SQUID_CERT_DIR/squid.crt" >> "$BUNDLE"
+        echo "CA bundle written to $BUNDLE"
