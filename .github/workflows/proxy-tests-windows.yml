@@ -160,26 +160,78 @@ jobs:
           $env:HOST = "0.0.0.0"
           $env:CERT_DIR = $certDir
 
-          $httpProc = Start-Process -FilePath "node" -ArgumentList "tests\proxy\server\http-server.js" -NoNewWindow -PassThru
-          $httpsProc = Start-Process -FilePath "node" -ArgumentList "tests\proxy\server\https-server.js" -NoNewWindow -PassThru
-          $httpsCertProc = Start-Process -FilePath "node" -ArgumentList "tests\proxy\server\https-client-cert-server.js" -NoNewWindow -PassThru
+          # Stop the default squid service installed by choco
+          Stop-Service squid -ErrorAction SilentlyContinue
+          Get-Process -Name squid -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          Start-Sleep 2
+          Remove-Item "C:\var\run\squid.pid" -ErrorAction SilentlyContinue
+          Remove-Item "/var/run/squid.pid" -ErrorAction SilentlyContinue
 
+          # Start node servers as background jobs (Start-Process doesn't keep processes alive)
+          $httpJob = Start-Job -ScriptBlock {
+            $env:HOST = $using:env:HOST
+            & node "$using:PWD\tests\proxy\server\http-server.js" 2>&1
+          }
+          $httpsJob = Start-Job -ScriptBlock {
+            $env:HOST = $using:env:HOST
+            $env:CERT_DIR = $using:certDir
+            & node "$using:PWD\tests\proxy\server\https-server.js" 2>&1
+          }
+          $httpsCertJob = Start-Job -ScriptBlock {
+            $env:HOST = $using:env:HOST
+            $env:CERT_DIR = $using:certDir
+            & node "$using:PWD\tests\proxy\server\https-client-cert-server.js" 2>&1
+          }
+
+          # Start squid with our config
           $squidBin = "C:\Squid\bin\squid.exe"
           if (!(Test-Path $squidBin)) {
             $squidBin = (Get-Command squid -ErrorAction SilentlyContinue).Source
             if (!$squidBin) { throw "squid not found" }
           }
-          $squidProc = Start-Process -FilePath $squidBin -ArgumentList "-N -f `"$squidConf`"" -NoNewWindow -PassThru
+          $squidJob = Start-Job -ScriptBlock {
+            & $using:squidBin -N -f $using:squidConf 2>&1
+          }
+
+          Start-Sleep 3
+          Write-Host "Server jobs: HTTP=$($httpJob.State) HTTPS=$($httpsJob.State) HTTPSCert=$($httpsCertJob.State) Squid=$($squidJob.State)"
+
+          # Show early output from jobs for debugging
+          foreach ($j in @(@{N="HTTP";J=$httpJob}, @{N="HTTPS";J=$httpsJob}, @{N="HTTPSCert";J=$httpsCertJob}, @{N="Squid";J=$squidJob})) {
+            $out = Receive-Job -Job $j.J -Keep 2>$null
+            if ($out) { Write-Host "$($j.N): $($out | Select-Object -First 3 | Out-String)" }
+          }
 
           # =================================================================
           # 5. Health checks
           # =================================================================
           Write-Host "==> Health checks..."
 
+          # Windows curl.exe uses Schannel which ignores --cacert for self-signed certs.
+          # Use Node.js for HTTPS health checks since it uses OpenSSL and respects custom CA certs.
+          $healthCheckJs = "$env:TEMP\health-check.js"
+          @"
+          const https = require('https');
+          const http = require('http');
+          const fs = require('fs');
+          const [proto, host, port, ...caFiles] = process.argv.slice(2);
+          const opts = { hostname: host, port: Number(port), path: '/', timeout: 3000 };
+          if (caFiles.length) opts.ca = caFiles.map(f => fs.readFileSync(f));
+          if (process.env.CLIENT_CERT) { opts.cert = fs.readFileSync(process.env.CLIENT_CERT); opts.key = fs.readFileSync(process.env.CLIENT_KEY); }
+          const mod = proto === 'https' ? https : http;
+          const req = mod.get(opts, (res) => { process.exit(res.statusCode === 200 ? 0 : 1); });
+          req.on('error', () => process.exit(1));
+          req.on('timeout', () => { req.destroy(); process.exit(1); });
+          "@ | Set-Content $healthCheckJs
+
           $checks = @(
-            @{ Name = "HTTP server :8070"; Cmd = { curl.exe -sf http://127.0.0.1:8070/ 2>$null } },
-            @{ Name = "HTTPS server :8071"; Cmd = { curl.exe -sf --cacert "$certDir\server.pem" https://127.0.0.1:8071/ 2>$null } },
-            @{ Name = "HTTPS client-cert :8072"; Cmd = { curl.exe -sf --cacert "$certDir\server.pem" --cert "$certDir\client.crt" --key "$certDir\client.key" https://127.0.0.1:8072/ 2>$null } },
+            @{ Name = "HTTP server :8070"; Cmd = { node $healthCheckJs http 127.0.0.1 8070 2>$null } },
+            @{ Name = "HTTPS server :8071"; Cmd = { node $healthCheckJs https 127.0.0.1 8071 "$certDir\server.pem" 2>$null } },
+            @{ Name = "HTTPS client-cert :8072"; Cmd = {
+              $env:CLIENT_CERT = "$certDir\client.crt"; $env:CLIENT_KEY = "$certDir\client.key"
+              node $healthCheckJs https 127.0.0.1 8072 "$certDir\server.pem" 2>$null
+              Remove-Item Env:\CLIENT_CERT, Env:\CLIENT_KEY -ErrorAction SilentlyContinue
+            } },
             @{ Name = "Squid HTTP proxy :8090"; Cmd = { curl.exe -sf --proxy http://user:password@127.0.0.1:8090 http://127.0.0.1:8070/ 2>$null } },
             @{ Name = "Squid HTTPS proxy :8091"; Cmd = { curl.exe -sf --proxy https://user:password@127.0.0.1:8091 --proxy-cacert "$squidCertDir\squid.crt" http://127.0.0.1:8070/ 2>$null } }
           )
@@ -248,9 +300,9 @@ jobs:
           # 7. Cleanup
           # =================================================================
           Write-Host "==> Cleaning up..."
-          $httpProc, $httpsProc, $httpsCertProc, $squidProc | ForEach-Object {
-            if ($_ -and !$_.HasExited) { $_.Kill() }
-          }
+          $httpJob, $httpsJob, $httpsCertJob, $squidJob | Stop-Job -ErrorAction SilentlyContinue
+          $httpJob, $httpsJob, $httpsCertJob, $squidJob | Remove-Job -Force -ErrorAction SilentlyContinue
+          Get-Process -Name node,squid -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 
           if ($failures -gt 0) {
             throw "CLI tests: $failures group(s) had errors"
