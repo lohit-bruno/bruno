@@ -6,8 +6,7 @@ jobs:
   tests-for-windows:
     name: Proxy Tests - Windows
     timeout-minutes: 30
-    runs-on:
-      - codebuild-windows_github_action_runner-${{ github.run_id }}-${{ github.run_attempt }}
+    runs-on: windows_self_hosted_github_actions_runner
     permissions:
       checks: write
       pull-requests: write
