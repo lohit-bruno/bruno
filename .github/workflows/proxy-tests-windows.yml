@@ -1,0 +1,308 @@
+name: Proxy tests windows
+on:
+  workflow_dispatch:
+
+jobs:
+  tests-for-windows:
+    name: Proxy Tests - Windows
+    timeout-minutes: 30
+    runs-on:
+      - codebuild-windows_github_action_runner-${{ github.run_id }}-${{ github.run_attempt }}
+    permissions:
+      checks: write
+      pull-requests: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node Dependencies
+        uses: ./.github/actions/common/setup-node-deps
+
+      - name: Setup servers and run proxy tests
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $certDir = "$(Get-Location)\tests\proxy\server\certs"
+          $squidCertDir = "$(Get-Location)\tests\proxy\squid\certs"
+          $BRU = "$(Get-Location)\packages\bruno-cli\bin\bru.js"
+
+          # =================================================================
+          # 1. Install Squid
+          # =================================================================
+          Write-Host "==> Installing Squid..."
+          choco install squid --no-progress -y
+
+          # =================================================================
+          # 2. Generate certificates
+          # =================================================================
+          Write-Host "==> Generating certificates..."
+          New-Item -ItemType Directory -Path $certDir -Force | Out-Null
+          New-Item -ItemType Directory -Path $squidCertDir -Force | Out-Null
+
+          # Server cert
+          @"
+          [req]
+          distinguished_name = req_dn
+          x509_extensions = v3_req
+          prompt = no
+          [req_dn]
+          CN = localhost
+          [v3_req]
+          subjectAltName = IP:127.0.0.1,DNS:localhost
+          "@ | Set-Content "$certDir\server-ext.cnf"
+
+          openssl req -x509 -newkey rsa:2048 `
+            -keyout "$certDir\server.key" -out "$certDir\server.crt" `
+            -days 3650 -nodes -config "$certDir\server-ext.cnf" -extensions v3_req 2>$null
+          if ($LASTEXITCODE -ne 0) { throw "Failed to generate server cert" }
+          openssl x509 -in "$certDir\server.crt" -out "$certDir\server.pem" -outform PEM
+
+          # Squid cert
+          @"
+          [req]
+          distinguished_name = req_dn
+          x509_extensions = v3_req
+          prompt = no
+          [req_dn]
+          CN = squid-proxy
+          [v3_req]
+          subjectAltName = IP:127.0.0.1,DNS:localhost
+          "@ | Set-Content "$squidCertDir\squid-ext.cnf"
+
+          openssl req -x509 -newkey rsa:2048 `
+            -keyout "$squidCertDir\squid.key" -out "$squidCertDir\squid.crt" `
+            -days 3650 -nodes -config "$squidCertDir\squid-ext.cnf" -extensions v3_req 2>$null
+          if ($LASTEXITCODE -ne 0) { throw "Failed to generate squid cert" }
+          Get-Content "$squidCertDir\squid.key", "$squidCertDir\squid.crt" | Set-Content "$squidCertDir\squid.pem"
+
+          # Client CA + client cert (for mTLS tests)
+          @"
+          [req]
+          distinguished_name = req_dn
+          prompt = no
+          [req_dn]
+          CN = Bruno Test Client CA
+          "@ | Set-Content "$certDir\client-ca-ext.cnf"
+
+          openssl req -x509 -newkey rsa:2048 `
+            -keyout "$certDir\client-ca.key" -out "$certDir\client-ca.crt" `
+            -days 3650 -nodes -config "$certDir\client-ca-ext.cnf" 2>$null
+
+          @"
+          [req]
+          distinguished_name = req_dn
+          prompt = no
+          [req_dn]
+          CN = Bruno Test Client
+          "@ | Set-Content "$certDir\client-ext.cnf"
+
+          openssl req -newkey rsa:2048 `
+            -keyout "$certDir\client.key" -out "$certDir\client.csr" `
+            -nodes -config "$certDir\client-ext.cnf" 2>$null
+
+          openssl x509 -req -in "$certDir\client.csr" `
+            -CA "$certDir\client-ca.crt" -CAkey "$certDir\client-ca.key" `
+            -CAcreateserial -out "$certDir\client.crt" -days 3650 2>$null
+
+          openssl pkcs12 -export -out "$certDir\client.p12" `
+            -inkey "$certDir\client.key" -in "$certDir\client.crt" `
+            -certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -macalg sha1 `
+            -passout pass:bruno-test
+
+          New-Item -ItemType File -Path "$certDir\empty-ca.pem" -Force | Out-Null
+          Write-Host "Certificates generated"
+
+          # =================================================================
+          # 3. Configure Squid
+          # =================================================================
+          Write-Host "==> Configuring Squid..."
+
+          # htpasswd
+          $htpasswdDir = "C:\Squid\etc"
+          if (!(Test-Path $htpasswdDir)) { New-Item -ItemType Directory -Path $htpasswdDir -Force }
+          $hash = & openssl passwd -apr1 "password"
+          "user:$hash" | Set-Content "$htpasswdDir\htpasswd"
+
+          # Find basic_ncsa_auth
+          $ncsa = $null
+          foreach ($p in @("C:\Squid", "C:\ProgramData\chocolatey\lib\squid")) {
+            if (Test-Path $p) {
+              $ncsa = Get-ChildItem -Path $p -Recurse -Filter "basic_ncsa_auth*" -ErrorAction SilentlyContinue | Select-Object -First 1
+              if ($ncsa) { break }
+            }
+          }
+          if (!$ncsa) { throw "basic_ncsa_auth not found" }
+          $ncsaPath = $ncsa.FullName -replace '\\', '/'
+          Write-Host "Found basic_ncsa_auth at: $ncsaPath"
+
+          $squidCertPath = ($squidCertDir -replace '\\', '/') + "/squid.pem"
+          $htpasswdPath = "$htpasswdDir\htpasswd" -replace '\\', '/'
+          $squidLogDir = "$env:TEMP\squid-logs" -replace '\\', '/'
+          New-Item -ItemType Directory -Path "$env:TEMP\squid-logs" -Force | Out-Null
+
+          $squidConf = "$env:TEMP\squid-bruno.conf"
+          (Get-Content tests\proxy\server\squid.conf) `
+            -replace '@SQUID_CERT@', $squidCertPath `
+            -replace '/usr/lib/squid/basic_ncsa_auth', $ncsaPath `
+            -replace '/etc/squid/htpasswd', $htpasswdPath `
+            -replace 'access_log stdio:/var/log/squid/access.log bruno', "access_log stdio:$squidLogDir/access.log bruno" `
+            -replace 'cache_log /dev/null', "cache_log $squidLogDir/cache.log" |
+            Set-Content $squidConf
+
+          Write-Host "Squid config written to $squidConf"
+
+          # =================================================================
+          # 4. Start all servers
+          # =================================================================
+          Write-Host "==> Starting servers..."
+          $env:HOST = "0.0.0.0"
+          $env:CERT_DIR = $certDir
+
+          $httpProc = Start-Process -FilePath "node" -ArgumentList "tests\proxy\server\http-server.js" -NoNewWindow -PassThru
+          $httpsProc = Start-Process -FilePath "node" -ArgumentList "tests\proxy\server\https-server.js" -NoNewWindow -PassThru
+          $httpsCertProc = Start-Process -FilePath "node" -ArgumentList "tests\proxy\server\https-client-cert-server.js" -NoNewWindow -PassThru
+
+          $squidBin = "C:\Squid\bin\squid.exe"
+          if (!(Test-Path $squidBin)) {
+            $squidBin = (Get-Command squid -ErrorAction SilentlyContinue).Source
+            if (!$squidBin) { throw "squid not found" }
+          }
+          $squidProc = Start-Process -FilePath $squidBin -ArgumentList "-N -f `"$squidConf`"" -NoNewWindow -PassThru
+
+          # =================================================================
+          # 5. Health checks
+          # =================================================================
+          Write-Host "==> Health checks..."
+
+          $checks = @(
+            @{ Name = "HTTP server :8070"; Cmd = { curl.exe -sf http://127.0.0.1:8070/ 2>$null } },
+            @{ Name = "HTTPS server :8071"; Cmd = { curl.exe -sf --cacert "$certDir\server.pem" https://127.0.0.1:8071/ 2>$null } },
+            @{ Name = "HTTPS client-cert :8072"; Cmd = { curl.exe -sf --cacert "$certDir\server.pem" --cert "$certDir\client.crt" --key "$certDir\client.key" https://127.0.0.1:8072/ 2>$null } },
+            @{ Name = "Squid HTTP proxy :8090"; Cmd = { curl.exe -sf --proxy http://user:password@127.0.0.1:8090 http://127.0.0.1:8070/ 2>$null } },
+            @{ Name = "Squid HTTPS proxy :8091"; Cmd = { curl.exe -sf --proxy https://user:password@127.0.0.1:8091 --proxy-cacert "$squidCertDir\squid.crt" http://127.0.0.1:8070/ 2>$null } }
+          )
+
+          foreach ($check in $checks) {
+            Write-Host -NoNewline "Waiting for $($check.Name)..."
+            $ready = $false
+            for ($i = 1; $i -le 30; $i++) {
+              & $check.Cmd | Out-Null
+              if ($LASTEXITCODE -eq 0) { Write-Host " ready"; $ready = $true; break }
+              Start-Sleep 2
+            }
+            if (!$ready) {
+              Write-Host " FAILED"
+              if ($check.Name -match "HTTPS proxy") {
+                Write-Host "WARNING: Squid HTTPS proxy not ready — continuing"
+              } else {
+                throw "$($check.Name) did not become ready"
+              }
+            }
+          }
+
+          # CA bundle
+          Get-Content "$certDir\server.pem", "$squidCertDir\squid.crt" | Set-Content "$certDir\ca-bundle.pem"
+          Write-Host "==> All servers ready."
+
+          # =================================================================
+          # 6. CLI tests
+          # =================================================================
+          $failures = 0
+
+          foreach ($sandbox in @("safe", "developer")) {
+            Write-Host ""
+            Write-Host "========================================"
+            Write-Host "==> Sandbox mode: $sandbox"
+            Write-Host "========================================"
+
+            Write-Host "--- No proxy: run all requests ---"
+            Push-Location tests\proxy\fixtures\collection-no-proxy
+            node $BRU run ./ --env prod --output "junit1-${sandbox}.xml" --insecure --sandbox $sandbox --format junit
+            if ($LASTEXITCODE -ne 0) { $failures++ }
+            node $BRU run ./https.yml --env prod --output "junit2-${sandbox}.xml" --cacert "$certDir\server.pem" --ignore-truststore --sandbox $sandbox --format junit
+            if ($LASTEXITCODE -ne 0) { $failures++ }
+            Pop-Location
+
+            Write-Host "--- HTTP proxy: run all requests ---"
+            Push-Location tests\proxy\fixtures\collection-http-proxy
+            node $BRU run ./ --env prod --output "junit-${sandbox}.xml" --cacert "$certDir\ca-bundle.pem" --sandbox $sandbox --format junit
+            if ($LASTEXITCODE -ne 0) { $failures++ }
+            Pop-Location
+
+            Write-Host "--- HTTPS proxy: run all requests ---"
+            Push-Location tests\proxy\fixtures\collection-https-proxy
+            node $BRU run ./ --env prod --output "junit-${sandbox}.xml" --cacert "$certDir\ca-bundle.pem" --sandbox $sandbox --format junit
+            if ($LASTEXITCODE -ne 0) { $failures++ }
+            Pop-Location
+
+            Write-Host "--- --noproxy: bypass collection proxy ---"
+            Push-Location tests\proxy\fixtures\collection-http-proxy
+            node $BRU run ./ --env prod --output "junit-noproxy-${sandbox}.xml" --noproxy --insecure --sandbox $sandbox --format junit
+            if ($LASTEXITCODE -ne 0) { $failures++ }
+            Pop-Location
+          }
+
+          # =================================================================
+          # 7. Cleanup
+          # =================================================================
+          Write-Host "==> Cleaning up..."
+          $httpProc, $httpsProc, $httpsCertProc, $squidProc | ForEach-Object {
+            if ($_ -and !$_.HasExited) { $_.Kill() }
+          }
+
+          if ($failures -gt 0) {
+            throw "CLI tests: $failures group(s) had errors"
+          }
+          Write-Host "==> All proxy tests passed."
+
+      - name: Debug diagnostics on failure
+        if: failure()
+        shell: pwsh
+        run: |
+          Write-Host "=== Listening Ports (8070-8072, 8090-8091) ==="
+          netstat -ano | Select-String "LISTENING" | Select-String "807|809"
+
+          Write-Host "`n=== All Listening Ports ==="
+          netstat -ano | Select-String "LISTENING" | Select-Object -First 30
+
+          Write-Host "`n=== Running Processes ==="
+          Get-Process -Name node,squid -ErrorAction SilentlyContinue | Format-Table Id, ProcessName, StartTime, Path
+
+          Write-Host "`n=== Squid Config ==="
+          Get-Content "$env:TEMP\squid-bruno.conf" -ErrorAction SilentlyContinue
+
+          Write-Host "`n=== Squid Cache Log ==="
+          $squidLogDir = "$env:TEMP\squid-logs"
+          if (Test-Path "$squidLogDir\cache.log") {
+            Get-Content "$squidLogDir\cache.log" -Tail 30
+          } else {
+            Write-Host "No cache.log at $squidLogDir\cache.log"
+            Get-ChildItem -Path "C:\Squid", "$env:TEMP" -Recurse -Filter "cache.log" -ErrorAction SilentlyContinue | ForEach-Object {
+              Write-Host "Found: $($_.FullName)"
+              Get-Content $_.FullName -Tail 20
+            }
+          }
+
+          Write-Host "`n=== Squid Access Log ==="
+          if (Test-Path "$squidLogDir\access.log") {
+            Get-Content "$squidLogDir\access.log" -Tail 20
+          } else {
+            Write-Host "No access.log at $squidLogDir\access.log"
+          }
+
+          Write-Host "`n=== Generated Certs ==="
+          $certDir = "$(Get-Location)\tests\proxy\server\certs"
+          $squidCertDir = "$(Get-Location)\tests\proxy\squid\certs"
+          Get-ChildItem $certDir -ErrorAction SilentlyContinue | Format-Table Name, Length, LastWriteTime
+          Get-ChildItem $squidCertDir -ErrorAction SilentlyContinue | Format-Table Name, Length, LastWriteTime
+
+          Write-Host "`n=== curl test HTTP ==="
+          curl.exe -v http://127.0.0.1:8070/ 2>&1
+
+          Write-Host "`n=== curl test HTTP proxy ==="
+          curl.exe -v --proxy http://user:password@127.0.0.1:8090 http://127.0.0.1:8070/ 2>&1
+
+          Write-Host "`n=== curl test HTTPS proxy ==="
+          curl.exe -v --proxy https://user:password@127.0.0.1:8091 --proxy-cacert "$squidCertDir\squid.crt" http://127.0.0.1:8070/ 2>&1

@@ -358,7 +358,7 @@ const runSingleRequest = async function (
       const caCertFilePath = options['cacert'];
       let caCertificatesData = getCACertificates({ caCertFilePath, shouldKeepDefaultCerts: !options['ignoreTruststore'] });
       let caCertificates = caCertificatesData.caCertificates;
-      httpsAgentRequestFields['ca'] = caCertificates || [];
+      httpsAgentRequestFields['ca'] = caCertificates;
     }
 
     const interpolationOptions = {

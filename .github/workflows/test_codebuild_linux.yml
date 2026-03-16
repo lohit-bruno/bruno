@@ -1,0 +1,97 @@
+name: codebuild test linux
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on:
+      - codebuild-linux_github_action_runner-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: System info
+        run: |
+          echo "--- OS ---"
+          cat /etc/os-release
+          echo ""
+          echo "--- Kernel ---"
+          uname -a
+          echo ""
+          echo "--- Architecture ---"
+          arch
+          echo ""
+          echo "--- Memory ---"
+          free -h
+          echo ""
+          echo "--- CPU ---"
+          nproc
+          lscpu | grep -E "Model name|Architecture|CPU\(s\):"
+
+      - name: Check available tools
+        run: |
+          echo "--- Node.js ---"
+          node --version 2>/dev/null || echo "node not found"
+          npm --version 2>/dev/null || echo "npm not found"
+
+          echo "--- Git ---"
+          git --version
+
+          echo "--- OpenSSL ---"
+          openssl version 2>/dev/null || echo "openssl not found"
+
+          echo "--- curl ---"
+          curl --version 2>/dev/null | head -1 || echo "curl not found"
+
+          echo "--- Python ---"
+          python3 --version 2>/dev/null || echo "python3 not found"
+
+          echo "--- Package manager ---"
+          apt-get --version 2>/dev/null | head -1 || echo "apt-get not found"
+          yum --version 2>/dev/null | head -1 || echo "yum not found"
+
+          echo "--- Squid ---"
+          squid -v 2>/dev/null | head -1 || echo "squid not found"
+
+          echo "--- Docker ---"
+          docker --version 2>/dev/null || echo "docker not found"
+
+      - name: Check network
+        run: |
+          echo "--- IP addresses ---"
+          ip addr show 2>/dev/null || ifconfig 2>/dev/null || echo "no ip/ifconfig"
+
+          echo "--- Listening ports ---"
+          ss -tlnp 2>/dev/null | head -20 || netstat -tlnp 2>/dev/null | head -20 || echo "no ss/netstat"
+
+          echo "--- DNS resolution ---"
+          getent hosts localhost || echo "getent not available"
+          cat /etc/resolv.conf 2>/dev/null || true
+
+      - name: Check disk and paths
+        run: |
+          echo "--- Disk space ---"
+          df -h
+
+          echo "--- Working directory ---"
+          pwd
+
+          echo "--- PATH entries ---"
+          echo "$PATH" | tr ':' '\n'
+
+          echo "--- Temp directory ---"
+          echo "${TMPDIR:-/tmp}"
+
+      - name: Check user and permissions
+        run: |
+          echo "--- Current user ---"
+          whoami
+          id
+
+          echo "--- Sudo available ---"
+          sudo -n true 2>/dev/null && echo "passwordless sudo: yes" || echo "passwordless sudo: no"
+
+          echo "--- Home directory ---"
+          echo "$HOME"
+          ls -la "$HOME"

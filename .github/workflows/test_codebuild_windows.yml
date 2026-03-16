@@ -1,0 +1,94 @@
+name: codebuild test windows
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on:
+      - codebuild-windows_github_action_runner-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: System info
+        shell: pwsh
+        run: |
+          Write-Host "OS: $([System.Environment]::OSVersion)"
+          Write-Host "Architecture: $env:PROCESSOR_ARCHITECTURE"
+          Write-Host "Computer: $env:COMPUTERNAME"
+          systeminfo | Select-String "OS Name","OS Version","System Type","Total Physical Memory"
+
+      - name: Check available tools
+        shell: pwsh
+        run: |
+          Write-Host "--- PowerShell ---"
+          $PSVersionTable | Format-Table -AutoSize
+
+          Write-Host "--- Node.js ---"
+          node --version 2>$null || Write-Host "node not found"
+          npm --version 2>$null || Write-Host "npm not found"
+
+          Write-Host "--- Git ---"
+          git --version
+
+          Write-Host "--- OpenSSL ---"
+          openssl version 2>$null || Write-Host "openssl not found"
+
+          Write-Host "--- Chocolatey ---"
+          choco --version 2>$null || Write-Host "choco not found"
+
+          Write-Host "--- curl ---"
+          curl.exe --version 2>$null || Write-Host "curl not found"
+
+      - name: Check network
+        shell: pwsh
+        run: |
+          Write-Host "--- IP Configuration ---"
+          ipconfig | Select-String "IPv4","Subnet","Gateway"
+
+          Write-Host "--- Listening ports ---"
+          netstat -ano | Select-String "LISTENING" | Select-Object -First 20
+
+          Write-Host "--- DNS resolution ---"
+          Resolve-DnsName localhost -ErrorAction SilentlyContinue | Format-Table
+
+      - name: Check disk and paths
+        shell: pwsh
+        run: |
+          Write-Host "--- Disk space ---"
+          Get-PSDrive -PSProvider FileSystem | Format-Table Name, Used, Free, @{N='Total(GB)';E={[math]::Round(($_.Used+$_.Free)/1GB,2)}}
+
+          Write-Host "--- Working directory ---"
+          Get-Location
+
+          Write-Host "--- PATH entries ---"
+          $env:PATH -split ';' | ForEach-Object { Write-Host $_ }
+
+          Write-Host "--- Temp directory ---"
+          Write-Host $env:TEMP
+
+      - name: Check Windows features
+        shell: pwsh
+        run: |
+          Write-Host "--- Installed programs (relevant) ---"
+          Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* |
+            Where-Object { $_.DisplayName -match 'node|git|python|visual|openssl|choco' } |
+            Select-Object DisplayName, DisplayVersion |
+            Format-Table -AutoSize
+
+          Write-Host "--- Visual C++ Redistributables ---"
+          Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* |
+            Where-Object { $_.DisplayName -match 'Visual C\+\+' } |
+            Select-Object DisplayName |
+            Format-Table -AutoSize
+
+      - name: Test bash availability
+        shell: bash
+        run: |
+          echo "--- Git Bash works ---"
+          echo "Shell: $SHELL"
+          echo "Bash version: $BASH_VERSION"
+          uname -a
+          which node || echo "node not in bash PATH"
+          which openssl || echo "openssl not in bash PATH"

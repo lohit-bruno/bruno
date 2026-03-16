@@ -22,12 +22,18 @@ export default defineConfig({
       name: 'default',
       testDir: './tests',
       testIgnore: [
-        'ssl/**' // custom CA certificate tests require separate server setup and certificate generation
+        'ssl/**',         // custom CA certificate tests require separate server setup and certificate generation
+        'proxy/**'  // proxy tests require Docker servers — run with: npm run test:proxy
       ]
     },
     {
       name: 'ssl',
       testDir: './tests/ssl'
+    },
+    {
+      name: 'proxy',
+      testDir: './tests/proxy',
+      // Requires test servers: bash .github/workflows/proxy-tests-macos.sh
     }
   ],
 

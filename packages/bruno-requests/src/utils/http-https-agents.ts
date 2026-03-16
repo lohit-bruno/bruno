@@ -65,7 +65,7 @@ type CACertificatesCount = {
 
 type CertsConfig = {
   caCertificatesCount?: CACertificatesCount;
-  ca?: string | string[];
+  ca?: string;
   cert?: Buffer;
   key?: Buffer;
   pfx?: Buffer;
@@ -76,7 +76,7 @@ type HttpsAgentRequestFields = {
   keepAlive?: boolean;
   rejectUnauthorized?: boolean;
   caCertificatesCount?: CACertificatesCount;
-  ca?: string | string[];
+  ca?: string;
 };
 
 type TlsOptions = HttpsAgentRequestFields & CertsConfig & {
@@ -256,7 +256,7 @@ const getCertsAndProxyConfig = ({
 
     // configure HTTPS agent with aggregated CA certificates
     certsConfig.caCertificatesCount = caCertificatesData.caCertificatesCount;
-    certsConfig.ca = caCertificatesData.caCertificates || [];
+    certsConfig.ca = caCertificatesData.caCertificates;
   }
 
   // client certificate config
@@ -534,6 +534,6 @@ const getHttpHttpsAgents = async ({
   return { httpAgent, httpsAgent };
 };
 
-export { getHttpHttpsAgents };
+export { getHttpHttpsAgents, getCertsAndProxyConfig };
 
 export type { GetHttpHttpsAgentsParams };

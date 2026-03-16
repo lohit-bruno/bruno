@@ -1,0 +1,101 @@
+name: Proxy tests
+on:
+  workflow_dispatch:
+
+jobs:
+  tests-for-linux:
+    name: Proxy Tests - Linux
+    timeout-minutes: 30
+    runs-on:
+      - codebuild-linux_github_action_runner-${{ github.run_id }}-${{ github.run_attempt }}
+    permissions:
+      checks: write
+      pull-requests: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node Dependencies
+        uses: ./.github/actions/common/setup-node-deps
+
+      - name: Setup Feature Dependencies
+        uses: ./.github/actions/proxy/linux/setup-feature-specific-deps
+
+      - name: Setup Servers
+        uses: ./.github/actions/proxy/linux/setup-servers
+
+      - name: Run Proxy CLI Tests
+        uses: ./.github/actions/proxy/linux/run-proxy-cli-tests
+
+      - name: Run Proxy E2E Tests
+        uses: ./.github/actions/proxy/linux/run-proxy-e2e-tests
+
+  # tests-for-macos:
+  #   name: Proxy Tests - macOS
+  #   timeout-minutes: 30
+  #   runs-on: macos-latest
+  #   permissions:
+  #     checks: write
+  #     pull-requests: write
+  #     contents: read
+
+  #   steps:
+  #     - uses: actions/checkout@v4
+
+  #     - name: Setup Node Dependencies
+  #       uses: ./.github/actions/common/setup-node-deps
+
+  #     - name: Setup Feature Dependencies
+  #       uses: ./.github/actions/proxy/macos/setup-feature-specific-deps
+
+  #     - name: Setup Servers
+  #       uses: ./.github/actions/proxy/macos/setup-servers
+
+  #     - name: Run Proxy CLI Tests
+  #       uses: ./.github/actions/proxy/macos/run-proxy-cli-tests
+
+  #     - name: Run Proxy E2E Tests
+  #       uses: ./.github/actions/proxy/macos/run-proxy-e2e-tests
+
+  tests-for-windows:
+    name: Proxy Tests - Windows
+    timeout-minutes: 30
+    runs-on:
+      - codebuild-windows_github_action_runner-${{ github.run_id }}-${{ github.run_attempt }}
+    permissions:
+      checks: write
+      pull-requests: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node Dependencies
+        uses: ./.github/actions/common/setup-node-deps
+
+      - name: Setup Servers
+        uses: ./.github/actions/proxy/windows/setup-servers
+
+      - name: Run Proxy CLI Tests
+        uses: ./.github/actions/proxy/windows/run-proxy-cli-tests
+
+      - name: Run Proxy E2E Tests
+        uses: ./.github/actions/proxy/windows/run-proxy-e2e-tests
+
+      - name: Debug diagnostics on failure
+        if: failure()
+        shell: pwsh
+        run: |
+          Write-Host "=== Listening Ports ==="
+          netstat -ano | Select-String "LISTENING" | Select-String "807|809"
+
+          Write-Host "=== Running Processes ==="
+          Get-Process -Name node,squid -ErrorAction SilentlyContinue | Format-Table Id, ProcessName, StartTime
+
+          Write-Host "=== curl test HTTP ==="
+          curl.exe -v http://127.0.0.1:8070/ 2>&1
+
+          Write-Host "=== curl test HTTPS proxy ==="
+          $squidCertDir = "$(Get-Location)\tests\proxy\squid\certs"
+          curl.exe -v --proxy https://user:password@127.0.0.1:8091 --proxy-cacert "$squidCertDir\squid.crt" http://127.0.0.1:8070/ 2>&1

@@ -1,0 +1,13 @@
+name: 'Run Proxy Tests - Linux'
+description: 'Run Playwright proxy integration tests on Linux'
+runs:
+  using: 'composite'
+  steps:
+    - name: Run proxy tests
+      shell: bash
+      env:
+        # Docker containers lack kernel features for Chrome sandbox (user namespaces, seccomp)
+        ELECTRON_EXTRA_LAUNCH_ARGS: "--no-sandbox"
+      run: |
+        set -euo pipefail
+        xvfb-run npm run test:e2e:proxy

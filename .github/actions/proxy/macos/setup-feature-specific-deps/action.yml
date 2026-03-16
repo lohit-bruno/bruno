@@ -1,0 +1,9 @@
+name: 'Setup Proxy Feature Dependencies - macOS'
+description: 'Install OS packages needed to run proxy tests on macOS (squid)'
+runs:
+  using: 'composite'
+  steps:
+    - name: Install squid
+      shell: bash
+      run: |
+        brew install squid

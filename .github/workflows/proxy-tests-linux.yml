@@ -1,0 +1,31 @@
+name: Proxy tests linux
+on:
+  workflow_dispatch:
+
+jobs:
+  tests-for-linux:
+    name: Proxy Tests - Linux
+    timeout-minutes: 30
+    runs-on: linux_self_hosted_github_actions_runner
+    permissions:
+      checks: write
+      pull-requests: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node Dependencies
+        uses: ./.github/actions/common/setup-node-deps
+
+      - name: Setup Feature Dependencies
+        uses: ./.github/actions/proxy/linux/setup-feature-specific-deps
+
+      - name: Setup Servers
+        uses: ./.github/actions/proxy/linux/setup-servers
+
+      - name: Run Proxy CLI Tests
+        uses: ./.github/actions/proxy/linux/run-proxy-cli-tests
+
+      - name: Run Proxy E2E Tests
+        uses: ./.github/actions/proxy/linux/run-proxy-e2e-tests

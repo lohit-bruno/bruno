@@ -1,0 +1,90 @@
+name: 'Run Proxy CLI Tests - Windows'
+description: 'Run proxy CLI tests on Windows with both sandbox modes'
+runs:
+  using: 'composite'
+  steps:
+    - name: Run collection-level no-proxy CLI tests
+      shell: pwsh
+      run: |
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = "Stop"
+
+        $BRU = "$(Get-Location)\packages\bruno-cli\bin\bru.js"
+        $CERT_DIR = "$(Get-Location)\tests\proxy\server\certs"
+
+        Set-Location tests\proxy\fixtures\collection-no-proxy
+
+        foreach ($sandbox in @("safe", "developer")) {
+          Write-Host "=== no proxy: run all requests (--sandbox $sandbox) ==="
+          node $BRU run ./ --env prod --output "junit1-${sandbox}.xml" --insecure --sandbox $sandbox --format junit
+          if ($LASTEXITCODE -ne 0) { throw "CLI run failed (--sandbox $sandbox)" }
+          [xml]$xml = Get-Content "junit1-${sandbox}.xml"
+          $count = ($xml.SelectNodes('//testsuite[@errors="0"]')).Count
+          if ($count -ne 5) { throw "Expected 5 passing testsuites, got $count (--sandbox $sandbox)" }
+
+          Write-Host "=== no proxy: HTTPS with cacert (--sandbox $sandbox) ==="
+          node $BRU run ./https.yml --env prod --output "junit2-${sandbox}.xml" --cacert "$CERT_DIR\server.pem" --ignore-truststore --sandbox $sandbox --format junit
+          if ($LASTEXITCODE -ne 0) { throw "CLI run failed (--sandbox $sandbox)" }
+          [xml]$xml2 = Get-Content "junit2-${sandbox}.xml"
+          $count2 = ($xml2.SelectNodes('//testsuite[@errors="0"]')).Count
+          if ($count2 -ne 1) { throw "Expected 1 passing testsuite, got $count2 (--sandbox $sandbox)" }
+        }
+
+    - name: Run collection-level HTTP proxy CLI tests
+      shell: pwsh
+      run: |
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = "Stop"
+
+        $BRU = "$(Get-Location)\packages\bruno-cli\bin\bru.js"
+        $CERT_DIR = "$(Get-Location)\tests\proxy\server\certs"
+
+        Set-Location tests\proxy\fixtures\collection-http-proxy
+
+        foreach ($sandbox in @("safe", "developer")) {
+          Write-Host "=== HTTP proxy: run all requests (--sandbox $sandbox) ==="
+          node $BRU run ./ --env prod --output "junit-${sandbox}.xml" --cacert "$CERT_DIR\ca-bundle.pem" --sandbox $sandbox --format junit
+          if ($LASTEXITCODE -ne 0) { throw "CLI run failed (--sandbox $sandbox)" }
+          [xml]$xml = Get-Content "junit-${sandbox}.xml"
+          $count = ($xml.SelectNodes('//testsuite[@errors="0"]')).Count
+          if ($count -ne 5) { throw "Expected 5 passing testsuites, got $count (--sandbox $sandbox)" }
+        }
+
+    - name: Run collection-level HTTPS proxy CLI tests
+      shell: pwsh
+      run: |
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = "Stop"
+
+        $BRU = "$(Get-Location)\packages\bruno-cli\bin\bru.js"
+        $CERT_DIR = "$(Get-Location)\tests\proxy\server\certs"
+
+        Set-Location tests\proxy\fixtures\collection-https-proxy
+
+        foreach ($sandbox in @("safe", "developer")) {
+          Write-Host "=== HTTPS proxy: run all requests (--sandbox $sandbox) ==="
+          node $BRU run ./ --env prod --output "junit-${sandbox}.xml" --cacert "$CERT_DIR\ca-bundle.pem" --sandbox $sandbox --format junit
+          if ($LASTEXITCODE -ne 0) { throw "CLI run failed (--sandbox $sandbox)" }
+          [xml]$xml = Get-Content "junit-${sandbox}.xml"
+          $count = ($xml.SelectNodes('//testsuite[@errors="0"]')).Count
+          if ($count -ne 5) { throw "Expected 5 passing testsuites, got $count (--sandbox $sandbox)" }
+        }
+
+    - name: Run --noproxy flag CLI tests
+      shell: pwsh
+      run: |
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = "Stop"
+
+        $BRU = "$(Get-Location)\packages\bruno-cli\bin\bru.js"
+
+        Set-Location tests\proxy\fixtures\collection-http-proxy
+
+        foreach ($sandbox in @("safe", "developer")) {
+          Write-Host "=== --noproxy: bypass collection proxy (--sandbox $sandbox) ==="
+          node $BRU run ./ --env prod --output "junit-noproxy-${sandbox}.xml" --noproxy --insecure --sandbox $sandbox --format junit
+          if ($LASTEXITCODE -ne 0) { throw "CLI run failed (--sandbox $sandbox)" }
+          [xml]$xml = Get-Content "junit-noproxy-${sandbox}.xml"
+          $count = ($xml.SelectNodes('//testsuite[@errors="0"]')).Count
+          if ($count -ne 5) { throw "Expected 5 passing testsuites, got $count (--sandbox $sandbox)" }
+        }

@@ -1,0 +1,5 @@
+# Generated certificates
+server/certs/
+
+# Test output
+fixtures/**/*.xml

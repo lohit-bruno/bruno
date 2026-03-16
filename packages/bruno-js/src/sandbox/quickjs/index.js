@@ -17,7 +17,7 @@ const { wrapScriptInClosure, SANDBOX } = require('../../utils/sandbox');
 let QuickJSSyncContext;
 const loader = memoizePromiseFactory(() => newQuickJSWASMModule());
 const getContext = (opts) => loader().then((mod) => (QuickJSSyncContext = mod.newContext(opts)));
-getContext();
+const contextReady = getContext();
 
 const toNumber = (value) => {
   const num = Number(value);
@@ -176,5 +176,6 @@ const executeQuickJsVmAsync = async ({ script: externalScript, context: external
 
 module.exports = {
   executeQuickJsVm,
-  executeQuickJsVmAsync
+  executeQuickJsVmAsync,
+  contextReady
 };

@@ -1,0 +1,31 @@
+name: Proxy tests macos
+on:
+  workflow_dispatch:
+
+jobs:
+  tests-for-macos:
+    name: Proxy Tests - macOS
+    timeout-minutes: 30
+    runs-on: macos_self_hosted_github_actions_runner
+    permissions:
+      checks: write
+      pull-requests: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node Dependencies
+        uses: ./.github/actions/common/setup-node-deps
+
+      - name: Setup Feature Dependencies
+        uses: ./.github/actions/proxy/macos/setup-feature-specific-deps
+
+      - name: Setup Servers
+        uses: ./.github/actions/proxy/macos/setup-servers
+
+      - name: Run Proxy CLI Tests
+        uses: ./.github/actions/proxy/macos/run-proxy-cli-tests
+
+      - name: Run Proxy E2E Tests
+        uses: ./.github/actions/proxy/macos/run-proxy-e2e-tests

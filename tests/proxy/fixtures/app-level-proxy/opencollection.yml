@@ -1,0 +1,30 @@
+opencollection: 1.0.0
+
+info:
+  name: app_level_proxy
+config:
+  proxy:
+    inherit: true
+    config:
+      protocol: http
+      hostname: ""
+      port: ""
+      auth:
+        username: ""
+        password: ""
+      bypassProxy: ""
+  clientCertificates:
+    - domain: "127.0.0.1"
+      type: pkcs12
+      pkcs12FilePath: ../../server/certs/client.p12
+      passphrase: bruno-test
+    - domain: "host.docker.internal"
+      type: pkcs12
+      pkcs12FilePath: ../../server/certs/client.p12
+      passphrase: bruno-test
+bundled: false
+extensions:
+  bruno:
+    ignore:
+      - node_modules
+      - .git

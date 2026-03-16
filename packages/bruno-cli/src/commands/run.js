@@ -640,6 +640,12 @@ const handler = async function (argv) {
 
     const runtime = getJsSandboxRuntime(sandbox);
 
+    // Ensure QuickJS WASM module is fully loaded before running any requests
+    if (runtime === 'quickjs') {
+      const { contextReady } = require('@usebruno/js/src/sandbox/quickjs');
+      await contextReady;
+    }
+
     // Fetch system proxy once for all requests (skip if --noproxy flag is set)
     if (!noproxy) {
       try {

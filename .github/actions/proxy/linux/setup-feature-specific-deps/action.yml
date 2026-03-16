@@ -1,0 +1,42 @@
+name: 'Setup Proxy Feature Dependencies - Linux'
+description: 'Install OS packages needed to run proxy tests on Linux (Electron + squid)'
+runs:
+  using: 'composite'
+  steps:
+    - name: Install dependencies
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get --no-install-recommends install -y \
+          libglib2.0-0 libnss3 libdbus-1-3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libgtk-3-0 \
+          $(apt-cache show libasound2t64 >/dev/null 2>&1 && echo libasound2t64 || echo libasound2) \
+          xvfb \
+          openssl \
+          squid-openssl \
+          apache2-utils \
+          libxml2-utils
+
+    - name: Fix Electron sandbox permissions
+      shell: bash
+      run: |
+        # Try multiple paths: $GITHUB_WORKSPACE, working directory, and find as fallback
+        SANDBOX=""
+        for candidate in \
+          "${GITHUB_WORKSPACE}/node_modules/electron/dist/chrome-sandbox" \
+          "$(pwd)/node_modules/electron/dist/chrome-sandbox"; do
+          if [ -f "$candidate" ]; then
+            SANDBOX="$candidate"
+            break
+          fi
+        done
+        # Fallback: search from working directory
+        if [ -z "$SANDBOX" ]; then
+          SANDBOX=$(find "$(pwd)" -path "*/electron/dist/chrome-sandbox" -type f 2>/dev/null | head -1 || true)
+        fi
+        if [ -n "$SANDBOX" ]; then
+          echo "Fixing sandbox permissions: $SANDBOX"
+          sudo chown root "$SANDBOX"
+          sudo chmod 4755 "$SANDBOX"
+        else
+          echo "WARNING: chrome-sandbox not found — Electron E2E tests may fail"
+        fi

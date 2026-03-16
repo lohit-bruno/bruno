@@ -1,0 +1,9 @@
+name: 'Run Proxy Tests - Windows'
+description: 'Run Playwright proxy integration tests on Windows'
+runs:
+  using: 'composite'
+  steps:
+    - name: Run proxy tests
+      shell: pwsh
+      run: |
+        npm run test:e2e:proxy

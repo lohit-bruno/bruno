@@ -1,0 +1,20 @@
+{
+  "maximized": false,
+  "lastOpenedCollections": ["{{projectRoot}}/tests/proxy/fixtures/collection-https-proxy"],
+  "preferences": {
+    "onboarding": {
+      "hasLaunchedBefore": true,
+      "hasSeenWelcomeModal": true
+    },
+    "request": {
+      "sslVerification": true,
+      "customCaCertificate": {
+        "enabled": true,
+        "filePath": "{{projectRoot}}/tests/proxy/server/certs/ca-bundle.pem"
+      },
+      "keepDefaultCaCertificates": {
+        "enabled": true
+      }
+    }
+  }
+}

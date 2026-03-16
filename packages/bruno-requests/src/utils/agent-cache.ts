@@ -64,7 +64,8 @@ function hashValue(value: string | Buffer | undefined): string | null {
 const secureContextCache = new Map<string, tls.SecureContext>();
 
 /**
- * Build a TLS secure context that adds custom CAs on top of the OpenSSL defaults.
+ * Build a TLS secure context with the given CA certificates.
+ *
  *
  * When Node.js receives an explicit `ca` option in tls.connect() or https.Agent,
  * it replaces the default CA store entirely. This means CAs that are only in the
@@ -74,18 +75,15 @@ const secureContextCache = new Map<string, tls.SecureContext>();
  * This function creates a secureContext starting from the OpenSSL defaults
  * and adds custom CAs on top via addCACert(), which appends rather than replaces.
  */
-function buildSecureContext(ca: string | Buffer | (string | Buffer)[]): tls.SecureContext {
+function buildSecureContext(ca: string): tls.SecureContext {
   const caHash = hashCaValue(ca);
   if (caHash && secureContextCache.has(caHash)) {
     return secureContextCache.get(caHash)!;
   }
 
   const ctx = tls.createSecureContext();
-  const caList = Array.isArray(ca) ? ca : [ca];
-  for (const cert of caList) {
-    if (cert) {
-      ctx.context.addCACert(cert);
-    }
+  if (ca) {
+    ctx.context.addCACert(ca);
   }
 
   if (caHash) {
@@ -96,8 +94,6 @@ function buildSecureContext(ca: string | Buffer | (string | Buffer)[]): tls.Secu
 
 /**
  * Convert agent options to use a secureContext instead of raw `ca`.
- * This ensures custom CAs are added on top of the OpenSSL defaults
- * rather than replacing the default CA store.
  *
  * When client certificates (pfx/cert/key) are also present, they are loaded
  * into the secure context so they aren't silently ignored by Node.js
@@ -119,9 +115,8 @@ function applySecureContext<T extends AgentOptions | HttpAgentOptions>(options: 
       if (rest.passphrase) ctxOptions.passphrase = rest.passphrase;
 
       const ctx = tls.createSecureContext(ctxOptions);
-      const caList = Array.isArray(ca) ? ca : [ca!];
-      for (const caCert of caList) {
-        if (caCert) ctx.context.addCACert(caCert);
+      if (ca) {
+        ctx.context.addCACert(ca);
       }
 
       const { pfx: _pfx, cert: _cert, key: _key, passphrase: _pass, ...cleanRest } = rest;
@@ -131,22 +126,16 @@ function applySecureContext<T extends AgentOptions | HttpAgentOptions>(options: 
     // CA-only case: use cached secure context
     return { ...rest, secureContext: buildSecureContext(ca!) } as unknown as T;
   }
+
   return options;
 }
 
 /**
- * Hash a CA value which can be a single value or an array of certificates.
- * Node.js TLS options allow ca to be string | Buffer | (string | Buffer)[].
+ * Hash a CA certificate string using SHA-256 and return a truncated hex string.
  */
-function hashCaValue(value: string | Buffer | (string | Buffer)[] | undefined): string | null {
+function hashCaValue(value: string | undefined): string | null {
   if (!value) return null;
-  if (Array.isArray(value)) {
-    // Concatenate all values with separator and hash together
-    const combined = value.map((v) => (Buffer.isBuffer(v) ? v.toString('base64') : String(v))).join('|');
-    return crypto.createHash('sha256').update(combined).digest('hex').slice(0, 16);
-  }
-  const data = Buffer.isBuffer(value) ? value : String(value);
-  return crypto.createHash('sha256').update(data).digest('hex').slice(0, 16);
+  return crypto.createHash('sha256').update(value).digest('hex').slice(0, 16);
 }
 
 /**
@@ -391,3 +380,6 @@ function getAgentCacheSize(): number {
 }
 
 export { getOrCreateHttpsAgent, getOrCreateHttpAgent, clearAgentCache, getAgentCacheSize };
+
+// Exported for testing only
+export { applySecureContext as _applySecureContext, buildSecureContext as _buildSecureContext, hashCaValue as _hashCaValue };

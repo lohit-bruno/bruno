@@ -1,0 +1,10 @@
+name: 'Run Proxy Tests - Macos'
+description: 'Run Playwright proxy integration tests on Macos'
+runs:
+  using: 'composite'
+  steps:
+    - name: Run proxy tests
+      shell: bash
+      run: |
+        set -euo pipefail
+        npm run test:e2e:proxy

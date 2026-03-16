@@ -45,10 +45,15 @@ export const runCollection = async (page: Page, collectionName: string) => {
     const collectionContainer = page.getByTestId('collections').locator('.collection-name').filter({ hasText: collectionName });
     await collectionContainer.waitFor({ state: 'visible' });
 
-    // Open collection actions menu - hover first to reveal the hidden actions button
+    // Open collection actions menu - hover to reveal the hidden actions button
+    // Retry hover since it can be flaky in CI environments
     const actionsContainer = collectionContainer.locator('.collection-actions');
-    await collectionContainer.hover();
-    await actionsContainer.waitFor({ state: 'visible' });
+    for (let attempt = 0; attempt < 10; attempt++) {
+      await collectionContainer.hover();
+      if (await actionsContainer.isVisible().catch(() => false)) break;
+      await page.waitForTimeout(500);
+    }
+    await actionsContainer.waitFor({ state: 'visible', timeout: 5000 });
 
     const icon = actionsContainer.locator('.icon');
     await icon.waitFor({ state: 'visible', timeout: 5000 });
