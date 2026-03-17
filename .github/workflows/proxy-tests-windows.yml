@@ -48,7 +48,7 @@ jobs:
       - name: Setup Node Dependencies
         uses: ./.github/actions/common/setup-node-deps
         with:
-          shell: cmd
+          shell: pwsh
 
       - name: Setup servers and run proxy tests
         shell: pwsh
