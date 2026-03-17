@@ -144,7 +144,9 @@ Write-Host "`n==> Configuring Squid..."
 
 # Node.js auth helper (replaces basic_ncsa_auth which needs cygcrypt-2.dll)
 $authHelperJs = "$env:TEMP\squid-auth-helper.js"
-$nodePath = (Get-Command node).Source -replace '\\', '/'
+# Use 8.3 short path to avoid spaces (e.g. "C:/Program Files/..." breaks Squid config parsing)
+$nodeFullPath = (Get-Command node).Source
+$nodePath = (New-Object -ComObject Scripting.FileSystemObject).GetFile($nodeFullPath).ShortPath -replace '\\', '/'
 @"
 const readline = require('readline');
 const rl = readline.createInterface({ input: process.stdin });
