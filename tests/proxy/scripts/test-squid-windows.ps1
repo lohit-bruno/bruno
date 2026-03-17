@@ -26,9 +26,15 @@ function Cleanup {
 trap { Cleanup }
 
 # =================================================================
-# 0. Prerequisites check
+# 0. Prerequisites
 # =================================================================
 Write-Host "==> Checking prerequisites..."
+
+# Add Squid to PATH if installed but not in PATH
+if (!(Get-Command squid -ErrorAction SilentlyContinue) -and (Test-Path "C:\Squid\bin\squid.exe")) {
+  $env:Path = "C:\Squid\bin;$env:Path"
+}
+
 foreach ($cmd in @("node", "openssl", "squid")) {
   $found = Get-Command $cmd -ErrorAction SilentlyContinue
   if ($found) { Write-Host "  OK: $cmd -> $($found.Source)" }
@@ -118,6 +124,14 @@ openssl x509 -req -in "$certDir\client.csr" `
   -CA "$certDir\client-ca.crt" -CAkey "$certDir\client-ca.key" `
   -CAcreateserial -out "$certDir\client.crt" -days 3650 2>$null
 if ($LASTEXITCODE -ne 0) { throw "Failed to sign client cert" }
+
+openssl pkcs12 -export -out "$certDir\client.p12" `
+  -inkey "$certDir\client.key" -in "$certDir\client.crt" `
+  -certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -macalg sha1 `
+  -passout pass:bruno-test
+if ($LASTEXITCODE -ne 0) { throw "Failed to export client PKCS12" }
+
+New-Item -ItemType File -Path "$certDir\empty-ca.pem" -Force | Out-Null
 Write-Host "  Client cert OK"
 
 Get-Content "$certDir\server.pem", "$squidCertDir\squid.crt" | Set-Content "$certDir\ca-bundle.pem"
@@ -232,46 +246,29 @@ req.on('timeout', () => { console.error('HEALTHCHECK TIMEOUT'); req.destroy(); p
 
 $results = @{}
 
-# HTTP
-Write-Host -NoNewline "  HTTP :8070..."
-node $healthCheckJs http 127.0.0.1 8070 2>$null
-$results["HTTP :8070"] = $LASTEXITCODE -eq 0
-Write-Host $(if ($results["HTTP :8070"]) { " OK" } else { " FAILED" })
+$checks = @(
+  @{ Name = "HTTP server :8070"; Cmd = { node $healthCheckJs http 127.0.0.1 8070 2>$null } },
+  @{ Name = "HTTPS server :8071"; Cmd = { node $healthCheckJs https 127.0.0.1 8071 "$certDir\server.pem" 2>$null } },
+  @{ Name = "HTTPS client-cert :8072"; Cmd = {
+    $env:CLIENT_CERT = "$certDir\client.crt"; $env:CLIENT_KEY = "$certDir\client.key"
+    node $healthCheckJs https 127.0.0.1 8072 "$certDir\server.pem" 2>$null
+    Remove-Item Env:\CLIENT_CERT, Env:\CLIENT_KEY -ErrorAction SilentlyContinue
+  } },
+  @{ Name = "Squid HTTP proxy :8090"; Cmd = { node -e "const h=require('http');const a=Buffer.from('user:password').toString('base64');const r=h.get({hostname:'127.0.0.1',port:8090,path:'http://127.0.0.1:8070/',headers:{'Proxy-Authorization':'Basic '+a},timeout:3000},s=>{process.exit(s.statusCode===200?0:1)});r.on('error',()=>process.exit(1));r.on('timeout',()=>{r.destroy();process.exit(1)})" 2>$null } },
+  @{ Name = "Squid HTTPS proxy :8091"; Cmd = { node -e "const t=require('tls'),f=require('fs');const a=Buffer.from('user:password').toString('base64');const s=t.connect({host:'127.0.0.1',port:8091,ca:f.readFileSync('$($squidCertDir -replace '\\','/')'+'/squid.crt')},()=>{s.write('GET http://127.0.0.1:8070/ HTTP/1.1\r\nHost: 127.0.0.1:8070\r\nProxy-Authorization: Basic '+a+'\r\n\r\n');let d='';s.on('data',c=>d+=c);s.on('end',()=>process.exit(d.includes('200')?0:1))});s.on('error',()=>process.exit(1));setTimeout(()=>process.exit(1),3000)" 2>$null } }
+)
 
-# HTTPS
-Write-Host -NoNewline "  HTTPS :8071..."
-node $healthCheckJs https 127.0.0.1 8071 "$certDir\server.pem" 2>$null
-$results["HTTPS :8071"] = $LASTEXITCODE -eq 0
-Write-Host $(if ($results["HTTPS :8071"]) { " OK" } else { " FAILED" })
-
-# HTTPS client-cert
-Write-Host -NoNewline "  HTTPS client-cert :8072..."
-$env:CLIENT_CERT = "$certDir\client.crt"; $env:CLIENT_KEY = "$certDir\client.key"
-node $healthCheckJs https 127.0.0.1 8072 "$certDir\server.pem" 2>$null
-$results["HTTPS mTLS :8072"] = $LASTEXITCODE -eq 0
-Remove-Item Env:\CLIENT_CERT, Env:\CLIENT_KEY -ErrorAction SilentlyContinue
-Write-Host $(if ($results["HTTPS mTLS :8072"]) { " OK" } else { " FAILED" })
-
-# Squid HTTP proxy
-Write-Host -NoNewline "  Squid HTTP proxy :8090..."
-for ($i = 1; $i -le 5; $i++) {
-  node -e "const h=require('http');const a=Buffer.from('user:password').toString('base64');const r=h.get({hostname:'127.0.0.1',port:8090,path:'http://127.0.0.1:8070/',headers:{'Proxy-Authorization':'Basic '+a},timeout:3000},s=>{process.exit(s.statusCode===200?0:1)});r.on('error',(e)=>{console.error(e.message);process.exit(1)});r.on('timeout',()=>{r.destroy();process.exit(1)})"
-  if ($LASTEXITCODE -eq 0) { break }
-  Start-Sleep 2
+foreach ($check in $checks) {
+  Write-Host -NoNewline "  $($check.Name)..."
+  $ok = $false
+  for ($i = 1; $i -le 30; $i++) {
+    & $check.Cmd | Out-Null
+    if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+    Start-Sleep 2
+  }
+  $results[$check.Name] = $ok
+  Write-Host $(if ($ok) { " OK" } else { " FAILED" })
 }
-$results["Squid HTTP :8090"] = $LASTEXITCODE -eq 0
-Write-Host $(if ($results["Squid HTTP :8090"]) { " OK" } else { " FAILED" })
-
-# Squid HTTPS proxy
-Write-Host -NoNewline "  Squid HTTPS proxy :8091..."
-$squidCrtPath = ($squidCertDir -replace '\\', '/') + '/squid.crt'
-for ($i = 1; $i -le 5; $i++) {
-  node -e "const t=require('tls'),f=require('fs');const a=Buffer.from('user:password').toString('base64');const s=t.connect({host:'127.0.0.1',port:8091,ca:f.readFileSync('$squidCrtPath')},()=>{s.write('GET http://127.0.0.1:8070/ HTTP/1.1\r\nHost: 127.0.0.1:8070\r\nProxy-Authorization: Basic '+a+'\r\n\r\n');let d='';s.on('data',c=>d+=c);s.on('end',()=>process.exit(d.includes('200')?0:1))});s.on('error',(e)=>{console.error(e.message);process.exit(1)});setTimeout(()=>process.exit(1),3000)"
-  if ($LASTEXITCODE -eq 0) { break }
-  Start-Sleep 2
-}
-$results["Squid HTTPS :8091"] = $LASTEXITCODE -eq 0
-Write-Host $(if ($results["Squid HTTPS :8091"]) { " OK" } else { " FAILED" })
 
 # =================================================================
 # 5. Summary
