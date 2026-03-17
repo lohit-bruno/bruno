@@ -85,14 +85,19 @@ jobs:
           @"
           [req]
           distinguished_name = req_dn
+          x509_extensions = v3_ca
           prompt = no
           [req_dn]
           CN = Bruno Test Client CA
+          [v3_ca]
+          basicConstraints = critical, CA:TRUE
+          subjectKeyIdentifier = hash
+          authorityKeyIdentifier = keyid:always, issuer
           "@ | Set-Content "$certDir\client-ca-ext.cnf"
 
           openssl req -x509 -newkey rsa:2048 `
             -keyout "$certDir\client-ca.key" -out "$certDir\client-ca.crt" `
-            -days 3650 -nodes -config "$certDir\client-ca-ext.cnf" 2>$null
+            -days 3650 -nodes -config "$certDir\client-ca-ext.cnf" -extensions v3_ca 2>$null
           if ($LASTEXITCODE -ne 0) { throw "Failed to generate client CA cert" }
 
           @"
