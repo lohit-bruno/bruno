@@ -8,6 +8,9 @@ const peerDepsExternal = require('rollup-plugin-peer-deps-external');
 
 const packageJson = require('./package.json');
 
+// Exit cleanly when event loop is empty to prevent hanging
+process.on('beforeExit', () => process.exit(0));
+
 module.exports = [
   {
     input: 'src/index.ts',
