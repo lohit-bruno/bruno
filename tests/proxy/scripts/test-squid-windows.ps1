@@ -16,10 +16,23 @@ function Cleanup {
   Write-Host "`n==> Cleaning up..."
   Get-Job | Stop-Job -ErrorAction SilentlyContinue
   Get-Job | Remove-Job -Force -ErrorAction SilentlyContinue
-  Get-Process -Name squid -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+  # Kill node servers and squid
+  Get-Process -Name node, squid -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+  # Kill anything still holding test ports (8070-8072, 8090-8091)
+  foreach ($port in @(8070, 8071, 8072, 8090, 8091)) {
+    $pids = netstat -ano | Select-String ":$port\s.*LISTENING" | ForEach-Object {
+      ($_ -split '\s+')[-1]
+    } | Sort-Object -Unique
+    foreach ($pid in $pids) {
+      if ($pid -and $pid -ne "0") {
+        Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
+      }
+    }
+  }
   @("C:\Squid\var\run\squid.pid", "C:\var\run\squid.pid") | ForEach-Object {
     Remove-Item $_ -Force -ErrorAction SilentlyContinue
   }
+  Start-Sleep 1
 }
 
 # Always clean up on exit

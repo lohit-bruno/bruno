@@ -170,13 +170,23 @@ jobs:
           $env:HOST = "0.0.0.0"
           $env:CERT_DIR = $certDir
 
-          # Kill any leftover squid from previous runs on this persistent runner
+          # Kill any leftover servers/proxy from previous runs on this persistent runner
           Stop-Service squid -ErrorAction SilentlyContinue
-          Get-Process -Name squid -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-          Start-Sleep 2
+          Get-Process -Name node, squid -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          foreach ($port in @(8070, 8071, 8072, 8090, 8091)) {
+            $pids = netstat -ano | Select-String ":$port\s.*LISTENING" | ForEach-Object {
+              ($_ -split '\s+')[-1]
+            } | Sort-Object -Unique
+            foreach ($pid in $pids) {
+              if ($pid -and $pid -ne "0") {
+                Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
+              }
+            }
+          }
           @("C:\Squid\var\run\squid.pid", "C:\var\run\squid.pid") | ForEach-Object {
             Remove-Item $_ -Force -ErrorAction SilentlyContinue
           }
+          Start-Sleep 1
 
           # Start node servers as background jobs
           $httpJob = Start-Job -ScriptBlock {
