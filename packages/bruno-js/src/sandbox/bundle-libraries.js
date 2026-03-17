@@ -2,7 +2,7 @@ const rollup = require('rollup');
 const { nodeResolve } = require('@rollup/plugin-node-resolve');
 const commonjs = require('@rollup/plugin-commonjs');
 const fs = require('fs');
-const { terser } = require('rollup-plugin-terser');
+const terser = require('@rollup/plugin-terser');
 
 const bundleLibraries = async () => {
   const codeScript = `
@@ -69,6 +69,7 @@ const bundleLibraries = async () => {
   try {
     const bundle = await rollup.rollup(config.input);
     const { output } = await bundle.generate(config.output);
+    await bundle.close();
     fs.writeFileSync(
       './src/sandbox/bundle-browser-rollup.js',
       `
@@ -82,6 +83,7 @@ const bundleLibraries = async () => {
     );
   } catch (error) {
     console.error('Error while bundling:', error);
+    process.exit(1);
   }
 };
 

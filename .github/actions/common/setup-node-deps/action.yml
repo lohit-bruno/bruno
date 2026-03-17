@@ -27,11 +27,34 @@ runs:
       if: inputs.skip-build != 'true'
       shell: ${{ inputs.shell }}
       run: |
+        echo "Building graphql-docs..."
         npm run build:graphql-docs
+        echo "✓ graphql-docs built successfully"
+
+        echo "Building bruno-query..."
         npm run build:bruno-query
+        echo "✓ bruno-query built successfully"
+
+        echo "Building bruno-common..."
         npm run build:bruno-common
+        echo "✓ bruno-common built successfully"
+
+        echo "Bundling sandbox libraries..."
         npm run sandbox:bundle-libraries --workspace=packages/bruno-js
+        echo "✓ Sandbox libraries bundled successfully"
+
+        echo "Building bruno-converters..."
         npm run build:bruno-converters
+        echo "✓ bruno-converters built successfully"
+
+        echo "Building bruno-requests..."
         npm run build:bruno-requests
+        echo "✓ bruno-requests built successfully"
+
+        echo "Building schema-types..."
         npm run build:schema-types
+        echo "✓ schema-types built successfully"
+
+        echo "Building bruno-filestore..."
         npm run build:bruno-filestore
+        echo "✓ bruno-filestore built successfully"
