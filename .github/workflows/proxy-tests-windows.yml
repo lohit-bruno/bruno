@@ -15,10 +15,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Install prerequisites
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          choco install squid --no-progress -y
+          # Refresh PATH to pick up newly installed binaries
+          $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+
       - name: Setup Node Dependencies
         uses: ./.github/actions/common/setup-node-deps
         with:
-          shell: pwsh
+          shell: cmd
 
       - name: Setup servers and run proxy tests
         shell: pwsh
@@ -30,13 +39,7 @@ jobs:
           $BRU = "$(Get-Location)\packages\bruno-cli\bin\bru.js"
 
           # =================================================================
-          # 1. Install Squid
-          # =================================================================
-          Write-Host "==> Installing Squid..."
-          choco install squid --no-progress -y
-
-          # =================================================================
-          # 2. Generate certificates
+          # 1. Generate certificates
           # =================================================================
           Write-Host "==> Generating certificates..."
           New-Item -ItemType Directory -Path $certDir -Force | Out-Null
@@ -90,6 +93,7 @@ jobs:
           openssl req -x509 -newkey rsa:2048 `
             -keyout "$certDir\client-ca.key" -out "$certDir\client-ca.crt" `
             -days 3650 -nodes -config "$certDir\client-ca-ext.cnf" 2>$null
+          if ($LASTEXITCODE -ne 0) { throw "Failed to generate client CA cert" }
 
           @"
           [req]
@@ -102,15 +106,18 @@ jobs:
           openssl req -newkey rsa:2048 `
             -keyout "$certDir\client.key" -out "$certDir\client.csr" `
             -nodes -config "$certDir\client-ext.cnf" 2>$null
+          if ($LASTEXITCODE -ne 0) { throw "Failed to generate client CSR" }
 
           openssl x509 -req -in "$certDir\client.csr" `
             -CA "$certDir\client-ca.crt" -CAkey "$certDir\client-ca.key" `
             -CAcreateserial -out "$certDir\client.crt" -days 3650 2>$null
+          if ($LASTEXITCODE -ne 0) { throw "Failed to sign client cert" }
 
           openssl pkcs12 -export -out "$certDir\client.p12" `
             -inkey "$certDir\client.key" -in "$certDir\client.crt" `
             -certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -macalg sha1 `
             -passout pass:bruno-test
+          if ($LASTEXITCODE -ne 0) { throw "Failed to export client PKCS12" }
 
           New-Item -ItemType File -Path "$certDir\empty-ca.pem" -Force | Out-Null
           Write-Host "Certificates generated"
@@ -247,6 +254,15 @@ jobs:
             }
             if (!$ready) {
               Write-Host " FAILED"
+              # Dump background job output for debugging
+              foreach ($j in @(@{N="HTTP";J=$httpJob}, @{N="HTTPS";J=$httpsJob}, @{N="HTTPSCert";J=$httpsCertJob}, @{N="Squid";J=$squidJob})) {
+                Write-Host "--- $($j.N) job (State: $($j.J.State)) ---"
+                $out = Receive-Job -Job $j.J -Keep -ErrorAction SilentlyContinue
+                if ($out) { Write-Host ($out | Out-String) } else { Write-Host "(no output)" }
+              }
+              # List generated cert files
+              Write-Host "--- Cert files in $certDir ---"
+              Get-ChildItem $certDir -ErrorAction SilentlyContinue | Format-Table Name, Length
               if ($check.Name -match "HTTPS proxy") {
                 Write-Host "WARNING: Squid HTTPS proxy not ready — continuing"
               } else {
