@@ -1,8 +1,8 @@
-# Quick Squid verification script for Windows self-hosted runner.
+# Squid server startup script for Windows self-hosted runner.
 # Run from the repo root: pwsh tests/proxy/scripts/test-squid-windows.ps1
 #
-# Tests: cert generation, Squid config, auth helper, server startup, health checks.
-# Skips npm ci / CLI tests — focuses only on the infrastructure.
+# Generates certificates, configures Squid, and starts all proxy test servers.
+# Does not run tests — use the GitHub Actions workflow for full testing.
 
 $ErrorActionPreference = "Stop"
 
@@ -258,104 +258,12 @@ if (Test-Path "$logDir\cache.log") {
   }
 }
 
-# =================================================================
-# 4. Health checks
-# =================================================================
-Write-Host "`n==> Health checks..."
-
-$healthCheckJs = "$env:TEMP\health-check.js"
-@"
-const https = require('https');
-const http = require('http');
-const fs = require('fs');
-const [proto, host, port, ...caFiles] = process.argv.slice(2);
-const opts = { hostname: host, port: Number(port), path: '/', timeout: 3000 };
-if (caFiles.length) opts.ca = caFiles.map(f => fs.readFileSync(f));
-if (process.env.CLIENT_CERT) { opts.cert = fs.readFileSync(process.env.CLIENT_CERT); opts.key = fs.readFileSync(process.env.CLIENT_KEY); }
-const mod = proto === 'https' ? https : http;
-const req = mod.get(opts, (res) => { process.exit(res.statusCode === 200 ? 0 : 1); });
-req.on('error', (e) => { console.error('HEALTHCHECK ERROR:', e.message); process.exit(1); });
-req.on('timeout', () => { console.error('HEALTHCHECK TIMEOUT'); req.destroy(); process.exit(1); });
-"@ | Set-Content $healthCheckJs
-
-$results = @{}
-
-$checks = @(
-  @{ Name = "HTTP server :8070"; Cmd = { node $healthCheckJs http 127.0.0.1 8070 2>$null } },
-  @{ Name = "HTTPS server :8071"; Cmd = { node $healthCheckJs https 127.0.0.1 8071 "$certDir\server.pem" 2>$null } },
-  @{ Name = "HTTPS client-cert :8072"; Cmd = {
-    $env:CLIENT_CERT = "$certDir\client.crt"; $env:CLIENT_KEY = "$certDir\client.key"
-    node $healthCheckJs https 127.0.0.1 8072 "$certDir\server.pem" 2>$null
-    Remove-Item Env:\CLIENT_CERT, Env:\CLIENT_KEY -ErrorAction SilentlyContinue
-  } },
-  @{ Name = "Squid HTTP proxy :8090"; Cmd = { node -e "const h=require('http');const a=Buffer.from('user:password').toString('base64');const r=h.get({hostname:'127.0.0.1',port:8090,path:'http://127.0.0.1:8070/',headers:{'Proxy-Authorization':'Basic '+a},timeout:3000},s=>{process.exit(s.statusCode===200?0:1)});r.on('error',()=>process.exit(1));r.on('timeout',()=>{r.destroy();process.exit(1)})" 2>$null } },
-  @{ Name = "Squid HTTPS proxy :8091"; Cmd = { node -e "const t=require('tls'),f=require('fs');const a=Buffer.from('user:password').toString('base64');const s=t.connect({host:'127.0.0.1',port:8091,ca:f.readFileSync('$($squidCertDir -replace '\\','/')'+'/squid.crt')},()=>{s.write('GET http://127.0.0.1:8070/ HTTP/1.1\r\nHost: 127.0.0.1:8070\r\nProxy-Authorization: Basic '+a+'\r\nConnection: close\r\n\r\n');let d='';s.on('data',c=>d+=c);s.on('end',()=>process.exit(d.includes('200')?0:1))});s.on('error',()=>process.exit(1));setTimeout(()=>process.exit(1),5000)" 2>$null } }
-)
-
-foreach ($check in $checks) {
-  Write-Host -NoNewline "  $($check.Name)..."
-  $ok = $false
-  for ($i = 1; $i -le 30; $i++) {
-    & $check.Cmd | Out-Null
-    if ($LASTEXITCODE -eq 0) { $ok = $true; break }
-    Start-Sleep 2
-  }
-  $results[$check.Name] = $ok
-  Write-Host $(if ($ok) { " OK" } else { " FAILED" })
-}
-
-# =================================================================
-# 5. Run CLI tests
-# =================================================================
-Write-Host "`n==> Running CLI tests..."
-
-$cliTestOutput = npm test --workspace=packages/bruno-cli 2>&1
-if ($LASTEXITCODE -ne 0) {
-  Write-Host "  CLI tests FAILED:"
-  Write-Host ($cliTestOutput | Out-String)
-  $results["CLI Tests"] = $false
-} else {
-  Write-Host "  CLI tests passed"
-  $results["CLI Tests"] = $true
-}
-
-# =================================================================
-# 6. Summary
-# =================================================================
-Write-Host "`n==> Results:"
-$failed = 0
-foreach ($kv in $results.GetEnumerator()) {
-  $status = if ($kv.Value) { "PASS" } else { "FAIL"; $failed++ }
-  Write-Host "  [$status] $($kv.Key)"
-}
-
-# Show squid logs on failure
-if ($failed -gt 0) {
-  Write-Host "`n==> Squid cache.log (last 30 lines):"
-  if (Test-Path "$logDir\cache.log") {
-    Get-Content "$logDir\cache.log" -Tail 30
-  } else {
-    Write-Host "  (not found)"
-  }
-  Write-Host "`n==> Squid access.log (last 10 lines):"
-  if (Test-Path "$logDir\access.log") {
-    Get-Content "$logDir\access.log" -Tail 10
-  } else {
-    Write-Host "  (not found)"
-  }
-
-  # Dump all job output
-  Write-Host "`n==> Job output:"
-  foreach ($j in $allJobs) {
-    Write-Host "--- $($j.N) (State: $($j.J.State)) ---"
-    $out = Receive-Job -Job $j.J -Keep -ErrorAction SilentlyContinue
-    if ($out) { Write-Host ($out | Out-String) } else { Write-Host "(no output)" }
-  }
-}
-
-Cleanup
-
-if ($failed -gt 0) {
-  throw "$failed health check(s) failed"
-}
-Write-Host "`n==> All checks passed!"
+Write-Host "`n==> All servers started successfully!"
+Write-Host "`nServers are running on the following ports:"
+Write-Host "  HTTP:           127.0.0.1:8070"
+Write-Host "  HTTPS:          127.0.0.1:8071"
+Write-Host "  HTTPS+mTLS:     127.0.0.1:8072"
+Write-Host "  Squid HTTP:     127.0.0.1:8090 (user:password)"
+Write-Host "  Squid HTTPS:    127.0.0.1:8091 (user:password)"
+Write-Host "`nCertificates are in: $certDir"
+Write-Host "Logs are in: $logDir"
