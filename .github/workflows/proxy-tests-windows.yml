@@ -165,6 +165,9 @@ jobs:
             Set-Content $squidConf
 
           Write-Host "Squid config written to $squidConf"
+          Write-Host "--- Squid config ---"
+          Get-Content $squidConf
+          Write-Host "---"
 
           # =================================================================
           # 4. Start all servers
@@ -202,17 +205,35 @@ jobs:
             $squidBin = (Get-Command squid -ErrorAction SilentlyContinue).Source
             if (!$squidBin) { throw "squid not found" }
           }
+          Write-Host "Squid binary: $squidBin"
+          Write-Host "Squid version: $(& $squidBin -v 2>&1 | Select-Object -First 1)"
+
+          # Initialize squid cache (required before first run)
+          Write-Host "Initializing Squid cache..."
+          & $squidBin -z --foreground -f $squidConf 2>&1 | ForEach-Object { Write-Host "squid-z: $_" }
+
           $squidJob = Start-Job -ScriptBlock {
             & $using:squidBin -N -f $using:squidConf 2>&1
           }
 
-          Start-Sleep 3
+          Start-Sleep 5
           Write-Host "Server jobs: HTTP=$($httpJob.State) HTTPS=$($httpsJob.State) HTTPSCert=$($httpsCertJob.State) Squid=$($squidJob.State)"
+
+          # Check listening ports
+          Write-Host "--- Listening ports (8070-8072, 8090-8091) ---"
+          netstat -ano | Select-String "LISTENING" | Select-String "807|809"
 
           # Show early output from jobs for debugging
           foreach ($j in @(@{N="HTTP";J=$httpJob}, @{N="HTTPS";J=$httpsJob}, @{N="HTTPSCert";J=$httpsCertJob}, @{N="Squid";J=$squidJob})) {
             $out = Receive-Job -Job $j.J -Keep 2>$null
-            if ($out) { Write-Host "$($j.N): $($out | Select-Object -First 3 | Out-String)" }
+            if ($out) { Write-Host "$($j.N): $($out | Select-Object -First 5 | Out-String)" }
+          }
+
+          # Check squid log for errors
+          $squidCacheLog = "$env:TEMP\squid-logs\cache.log"
+          if (Test-Path $squidCacheLog) {
+            Write-Host "--- Squid cache.log ---"
+            Get-Content $squidCacheLog -Tail 20
           }
 
           # =================================================================
