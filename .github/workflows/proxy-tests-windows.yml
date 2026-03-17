@@ -135,28 +135,28 @@ jobs:
           # =================================================================
           Write-Host "==> Configuring Squid..."
 
-          # htpasswd
-          $htpasswdDir = "C:\Squid\etc"
-          if (!(Test-Path $htpasswdDir)) { New-Item -ItemType Directory -Path $htpasswdDir -Force }
-          $hash = & openssl passwd -apr1 "password"
-          "user:$hash" | Set-Content "$htpasswdDir\htpasswd"
-
-          # Find basic_ncsa_auth
-          $ncsa = Get-ChildItem -Path "C:\Squid" -Recurse -Filter "basic_ncsa_auth*" -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (!$ncsa) { throw "basic_ncsa_auth not found under C:\Squid" }
-          $ncsaPath = $ncsa.FullName -replace '\\', '/'
-          Write-Host "Found basic_ncsa_auth at: $ncsaPath"
+          # Create a Node.js auth helper to replace basic_ncsa_auth (which requires cygcrypt-2.dll)
+          $authHelperJs = "$env:TEMP\squid-auth-helper.js"
+          $nodePath = (Get-Command node).Source -replace '\\', '/'
+          @"
+          const readline = require('readline');
+          const rl = readline.createInterface({ input: process.stdin });
+          rl.on('line', (line) => {
+            const [user, pass] = line.trim().split(' ');
+            process.stdout.write(user === 'user' && pass === 'password' ? 'OK\n' : 'ERR\n');
+          });
+          "@ | Set-Content $authHelperJs
+          $authHelperPath = ($authHelperJs -replace '\\', '/')
+          Write-Host "Auth helper: $nodePath $authHelperPath"
 
           $squidCertPath = ($squidCertDir -replace '\\', '/') + "/squid.pem"
-          $htpasswdPath = "$htpasswdDir\htpasswd" -replace '\\', '/'
           $squidLogDir = "$env:TEMP\squid-logs" -replace '\\', '/'
           New-Item -ItemType Directory -Path "$env:TEMP\squid-logs" -Force | Out-Null
 
           $squidConf = "$env:TEMP\squid-bruno.conf"
           (Get-Content tests\proxy\server\squid.conf) `
             -replace '@SQUID_CERT@', $squidCertPath `
-            -replace '/usr/lib/squid/basic_ncsa_auth', $ncsaPath `
-            -replace '/etc/squid/htpasswd', $htpasswdPath `
+            -replace '/usr/lib/squid/basic_ncsa_auth /etc/squid/htpasswd', "$nodePath $authHelperPath" `
             -replace 'access_log stdio:/var/log/squid/access.log bruno', "access_log stdio:$squidLogDir/access.log bruno" `
             -replace 'cache_log /dev/null', "cache_log $squidLogDir/cache.log" |
             Set-Content $squidConf
