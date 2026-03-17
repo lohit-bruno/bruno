@@ -305,7 +305,22 @@ foreach ($check in $checks) {
 }
 
 # =================================================================
-# 5. Summary
+# 5. Run CLI tests
+# =================================================================
+Write-Host "`n==> Running CLI tests..."
+
+$cliTestOutput = npm test --workspace=packages/bruno-cli 2>&1
+if ($LASTEXITCODE -ne 0) {
+  Write-Host "  CLI tests FAILED:"
+  Write-Host ($cliTestOutput | Out-String)
+  $results["CLI Tests"] = $false
+} else {
+  Write-Host "  CLI tests passed"
+  $results["CLI Tests"] = $true
+}
+
+# =================================================================
+# 6. Summary
 # =================================================================
 Write-Host "`n==> Results:"
 $failed = 0
