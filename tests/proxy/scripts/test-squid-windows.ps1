@@ -155,27 +155,47 @@ Write-Host "  Certificates: $(( Get-ChildItem $certDir | Measure-Object).Count) 
 # =================================================================
 Write-Host "`n==> Configuring Squid..."
 
-# Node.js auth helper (replaces basic_ncsa_auth which needs cygcrypt-2.dll)
-$authHelperJs = "$env:TEMP\squid-auth-helper.js"
-# Use 8.3 short path to avoid spaces (e.g. "C:/Program Files/..." breaks Squid config parsing)
-$nodeFullPath = (Get-Command node).Source
-$nodePath = (New-Object -ComObject Scripting.FileSystemObject).GetFile($nodeFullPath).ShortPath -replace '\\', '/'
-@"
-const readline = require('readline');
-const rl = readline.createInterface({ input: process.stdin });
-rl.on('line', (line) => {
-  const [user, pass] = line.trim().split(' ');
-  process.stdout.write(user === 'user' && pass === 'password' ? 'OK\n' : 'ERR\n');
-});
-"@ | Set-Content $authHelperJs
-$authHelperPath = ($authHelperJs -replace '\\', '/')
+# Install cygcrypt-2.dll if basic_ncsa_auth needs it
+$ncsa = Get-ChildItem -Path "C:\Squid" -Recurse -Filter "basic_ncsa_auth*" -ErrorAction SilentlyContinue | Select-Object -First 1
+if (!$ncsa) { throw "basic_ncsa_auth not found under C:\Squid" }
+& $ncsa.FullName --help 2>&1 | Out-Null
+if ($LASTEXITCODE -ne 0) {
+  Write-Host "  basic_ncsa_auth needs cygcrypt-2.dll — installing via Cygwin setup..."
+  $cygSetup = "$env:TEMP\cygwin-setup.exe"
+  if (!(Test-Path $cygSetup)) {
+    Invoke-WebRequest -Uri "https://cygwin.com/setup-x86_64.exe" -OutFile $cygSetup -UseBasicParsing
+  }
+  & $cygSetup --quiet-mode --no-desktop --no-shortcuts --no-startmenu `
+    --root "$env:TEMP\cygwin-tmp" `
+    --local-package-dir "$env:TEMP\cygwin-pkg" `
+    --site "https://mirrors.kernel.org/sourceware/cygwin/" `
+    --packages "libcrypt2" --wait
+  $dll = Get-ChildItem "$env:TEMP\cygwin-tmp" -Recurse -Filter "cygcrypt-2.dll" -ErrorAction SilentlyContinue | Select-Object -First 1
+  if ($dll) {
+    Copy-Item $dll.FullName "C:\Squid\bin\" -Force
+    Write-Host "  Installed cygcrypt-2.dll to C:\Squid\bin\"
+  } else {
+    throw "Failed to install cygcrypt-2.dll"
+  }
+}
+
+# htpasswd for Squid basic auth
+$htpasswdDir = "C:\Squid\etc"
+if (!(Test-Path $htpasswdDir)) { New-Item -ItemType Directory -Path $htpasswdDir -Force }
+$hash = & openssl passwd -apr1 "password"
+"user:$hash" | Set-Content "$htpasswdDir\htpasswd"
+
+$ncsaPath = $ncsa.FullName -replace '\\', '/'
+$htpasswdPath = "$htpasswdDir\htpasswd" -replace '\\', '/'
+Write-Host "  Auth helper: $ncsaPath $htpasswdPath"
 
 $squidCertPath = ($squidCertDir -replace '\\', '/') + "/squid.pem"
 $squidLogDir = $logDir -replace '\\', '/'
 
 (Get-Content tests\proxy\server\squid.conf) `
   -replace '@SQUID_CERT@', $squidCertPath `
-  -replace '/usr/lib/squid/basic_ncsa_auth /etc/squid/htpasswd', "$nodePath $authHelperPath" `
+  -replace '/usr/lib/squid/basic_ncsa_auth', $ncsaPath `
+  -replace '/etc/squid/htpasswd', $htpasswdPath `
   -replace 'access_log stdio:/var/log/squid/access.log bruno', "access_log stdio:$squidLogDir/access.log bruno" `
   -replace 'cache_log /dev/null', "cache_log $squidLogDir/cache.log" |
   Set-Content $squidConf
