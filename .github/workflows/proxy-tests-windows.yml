@@ -203,8 +203,8 @@ jobs:
               }
             }
           }
-          @("C:\Squid\var\run\squid.pid", "C:\var\run\squid.pid") | ForEach-Object {
-            Remove-Item $_ -Force -ErrorAction SilentlyContinue
+          @("C:\Squid\var\run\squid.pid", "C:\var\run\squid.pid", "/var/run/squid.pid") | ForEach-Object {
+            if (Test-Path $_) { Remove-Item $_ -Force -ErrorAction SilentlyContinue }
           }
           Start-Sleep 1
 
