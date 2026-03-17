@@ -158,24 +158,19 @@ Write-Host "`n==> Configuring Squid..."
 # Install cygcrypt-2.dll if basic_ncsa_auth needs it
 $ncsa = Get-ChildItem -Path "C:\Squid" -Recurse -Filter "basic_ncsa_auth*" -ErrorAction SilentlyContinue | Select-Object -First 1
 if (!$ncsa) { throw "basic_ncsa_auth not found under C:\Squid" }
-& $ncsa.FullName --help 2>&1 | Out-Null
-if ($LASTEXITCODE -ne 0) {
-  Write-Host "  basic_ncsa_auth needs cygcrypt-2.dll — installing via Cygwin setup..."
-  $cygSetup = "$env:TEMP\cygwin-setup.exe"
-  if (!(Test-Path $cygSetup)) {
-    Invoke-WebRequest -Uri "https://cygwin.com/setup-x86_64.exe" -OutFile $cygSetup -UseBasicParsing
-  }
-  & $cygSetup --quiet-mode --no-desktop --no-shortcuts --no-startmenu `
-    --root "$env:TEMP\cygwin-tmp" `
-    --local-package-dir "$env:TEMP\cygwin-pkg" `
-    --site "https://mirrors.kernel.org/sourceware/cygwin/" `
-    --packages "libcrypt2" --wait
-  $dll = Get-ChildItem "$env:TEMP\cygwin-tmp" -Recurse -Filter "cygcrypt-2.dll" -ErrorAction SilentlyContinue | Select-Object -First 1
+if (!(Test-Path "C:\Squid\bin\cygcrypt-2.dll")) {
+  Write-Host "  Installing cygcrypt-2.dll from Cygwin mirror..."
+  $pkg = "$env:TEMP\libcrypt2.tar.xz"
+  $extractDir = "$env:TEMP\libcrypt2"
+  Invoke-WebRequest -Uri "https://mirrors.kernel.org/sourceware/cygwin/x86_64/release/libxcrypt/libcrypt2/libcrypt2-4.4.68-1.tar.xz" -OutFile $pkg -UseBasicParsing
+  New-Item -ItemType Directory -Path $extractDir -Force | Out-Null
+  tar -xf $pkg -C $extractDir
+  $dll = Get-ChildItem $extractDir -Recurse -Filter "cygcrypt-2.dll" | Select-Object -First 1
   if ($dll) {
     Copy-Item $dll.FullName "C:\Squid\bin\" -Force
     Write-Host "  Installed cygcrypt-2.dll to C:\Squid\bin\"
   } else {
-    throw "Failed to install cygcrypt-2.dll"
+    throw "cygcrypt-2.dll not found in downloaded package"
   }
 }
 
