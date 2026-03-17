@@ -228,8 +228,8 @@ jobs:
           if (process.env.CLIENT_CERT) { opts.cert = fs.readFileSync(process.env.CLIENT_CERT); opts.key = fs.readFileSync(process.env.CLIENT_KEY); }
           const mod = proto === 'https' ? https : http;
           const req = mod.get(opts, (res) => { process.exit(res.statusCode === 200 ? 0 : 1); });
-          req.on('error', () => process.exit(1));
-          req.on('timeout', () => { req.destroy(); process.exit(1); });
+          req.on('error', (e) => { console.error('HEALTHCHECK ERROR:', e.message); process.exit(1); });
+          req.on('timeout', () => { console.error('HEALTHCHECK TIMEOUT'); req.destroy(); process.exit(1); });
           "@ | Set-Content $healthCheckJs
 
           $checks = @(
@@ -237,7 +237,7 @@ jobs:
             @{ Name = "HTTPS server :8071"; Cmd = { node $healthCheckJs https 127.0.0.1 8071 "$certDir\server.pem" 2>$null } },
             @{ Name = "HTTPS client-cert :8072"; Cmd = {
               $env:CLIENT_CERT = "$certDir\client.crt"; $env:CLIENT_KEY = "$certDir\client.key"
-              node $healthCheckJs https 127.0.0.1 8072 "$certDir\server.pem" 2>$null
+              node $healthCheckJs https 127.0.0.1 8072 "$certDir\server.pem"
               Remove-Item Env:\CLIENT_CERT, Env:\CLIENT_KEY -ErrorAction SilentlyContinue
             } },
             @{ Name = "Squid HTTP proxy :8090"; Cmd = { node -e "const h=require('http');const a=Buffer.from('user:password').toString('base64');const r=h.get({hostname:'127.0.0.1',port:8090,path:'http://127.0.0.1:8070/',headers:{'Proxy-Authorization':'Basic '+a},timeout:3000},s=>{process.exit(s.statusCode===200?0:1)});r.on('error',()=>process.exit(1));r.on('timeout',()=>{r.destroy();process.exit(1)})" 2>$null } },
