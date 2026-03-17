@@ -8,9 +8,6 @@ const json = require('@rollup/plugin-json');
 const { isBuiltin } = require('module');
 const packageJson = require('./package.json');
 
-// Exit cleanly when event loop is empty to prevent hanging
-process.on('beforeExit', () => process.exit(0));
-
 module.exports = [
   {
     input: 'src/index.ts',
