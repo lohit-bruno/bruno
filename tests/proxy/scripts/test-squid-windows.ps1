@@ -62,6 +62,8 @@ Cleanup
 # =================================================================
 Write-Host "`n==> Generating certificates..."
 New-Item -ItemType Directory -Path $certDir, $squidCertDir, $logDir -Force | Out-Null
+# Clear old log files so error checks don't pick up stale entries
+Remove-Item "$logDir\*" -Force -ErrorAction SilentlyContinue
 
 # Server cert
 @"
@@ -194,8 +196,10 @@ $squidLogDir = $logDir -replace '\\', '/'
   -replace 'access_log stdio:/var/log/squid/access.log bruno', "access_log stdio:$squidLogDir/access.log bruno" `
   -replace 'cache_log /dev/null', "cache_log $squidLogDir/cache.log" |
   Set-Content $squidConf
+# Add dns_nameservers since Cygwin Squid can't find /etc/resolv.conf on Windows
+Add-Content $squidConf "`ndns_nameservers 8.8.8.8 8.8.4.4"
 
-Write-Host "  Auth helper: $nodePath $authHelperPath"
+Write-Host "  Auth helper: $ncsaPath $htpasswdPath"
 Write-Host "  Squid config:"
 Get-Content $squidConf | ForEach-Object { Write-Host "    $_" }
 
@@ -285,7 +289,7 @@ $checks = @(
     Remove-Item Env:\CLIENT_CERT, Env:\CLIENT_KEY -ErrorAction SilentlyContinue
   } },
   @{ Name = "Squid HTTP proxy :8090"; Cmd = { node -e "const h=require('http');const a=Buffer.from('user:password').toString('base64');const r=h.get({hostname:'127.0.0.1',port:8090,path:'http://127.0.0.1:8070/',headers:{'Proxy-Authorization':'Basic '+a},timeout:3000},s=>{process.exit(s.statusCode===200?0:1)});r.on('error',()=>process.exit(1));r.on('timeout',()=>{r.destroy();process.exit(1)})" 2>$null } },
-  @{ Name = "Squid HTTPS proxy :8091"; Cmd = { node -e "const t=require('tls'),f=require('fs');const a=Buffer.from('user:password').toString('base64');const s=t.connect({host:'127.0.0.1',port:8091,ca:f.readFileSync('$($squidCertDir -replace '\\','/')'+'/squid.crt')},()=>{s.write('GET http://127.0.0.1:8070/ HTTP/1.1\r\nHost: 127.0.0.1:8070\r\nProxy-Authorization: Basic '+a+'\r\n\r\n');let d='';s.on('data',c=>d+=c);s.on('end',()=>process.exit(d.includes('200')?0:1))});s.on('error',()=>process.exit(1));setTimeout(()=>process.exit(1),3000)" 2>$null } }
+  @{ Name = "Squid HTTPS proxy :8091"; Cmd = { node -e "const t=require('tls'),f=require('fs');const a=Buffer.from('user:password').toString('base64');const s=t.connect({host:'127.0.0.1',port:8091,ca:f.readFileSync('$($squidCertDir -replace '\\','/')'+'/squid.crt')},()=>{s.write('GET http://127.0.0.1:8070/ HTTP/1.1\r\nHost: 127.0.0.1:8070\r\nProxy-Authorization: Basic '+a+'\r\nConnection: close\r\n\r\n');let d='';s.on('data',c=>d+=c);s.on('end',()=>process.exit(d.includes('200')?0:1))});s.on('error',()=>process.exit(1));setTimeout(()=>process.exit(1),5000)" 2>$null } }
 )
 
 foreach ($check in $checks) {
