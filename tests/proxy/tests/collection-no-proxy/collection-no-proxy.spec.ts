@@ -11,9 +11,9 @@ test.describe('Collection-level proxy disabled', () => {
 
     await runCollection(page, 'collection_no_proxy');
 
-    // 5 requests: http, https, http_example, https_example, https_badssl_client_cert
+    // 6 requests: http, https, http_example, https_example, https_client_cert, https_badssl_client_cert
     await validateRunnerResults(page, {
-      totalRequests: 5,
+      totalRequests: 6,
       passed: 5,
       failed: 0
     });

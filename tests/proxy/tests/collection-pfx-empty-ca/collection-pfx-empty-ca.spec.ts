@@ -18,14 +18,15 @@ test.describe('PFX client cert with empty CA and no default certs', () => {
     //   applySecureContext is skipped entirely. The agent receives the raw pfx option
     //   and Node.js uses its default tls.rootCertificates for server verification.
     //
-    // Uses collection_with_http_proxy which has 5 requests:
-    //   http, https (local), http_example, https_example, https_badssl_client_cert (local)
+    // Uses collection_with_http_proxy which has 6 requests:
+    //   http, https (local), http_example, https_example, https_client_cert (local), https_badssl_client_cert (badssl.com)
     //
-    // Expected: 3 pass, 2 fail
+    // Expected: 4 pass, 2 fail
     //   - http, http_example: pass (no TLS)
     //   - https (local:8071): fails (self-signed cert not in Node root CAs — expected)
     //   - https_example: passes (public CA in Node root CAs, PFX not loaded for this domain)
-    //   - https_badssl_client_cert (local:8072): fails (self-signed server cert not in Node root CAs)
+    //   - https_client_cert (local:8072): fails (self-signed server cert not in Node root CAs)
+    //   - https_badssl_client_cert (badssl.com): passes (valid public certificate)
     test.setTimeout(2 * 60 * 1000);
 
     await setSandboxMode(page, 'collection_with_http_proxy', 'developer');
@@ -35,8 +36,8 @@ test.describe('PFX client cert with empty CA and no default certs', () => {
     await runCollection(page, 'collection_with_http_proxy');
 
     await validateRunnerResults(page, {
-      totalRequests: 5,
-      passed: 3,
+      totalRequests: 6,
+      passed: 4,
       failed: 2
     });
   });
