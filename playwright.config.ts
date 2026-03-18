@@ -31,9 +31,15 @@ export default defineConfig({
       testDir: './tests/ssl'
     },
     {
+      name: 'proxy-setup',
+      testDir: './tests/proxy',
+      testMatch: 'badssl_client_cert_download.ts',
+    },
+    {
       name: 'proxy',
       testDir: './tests/proxy',
-      globalSetup: './tests/proxy/global-setup.ts',
+      testMatch: 'tests/**/*.spec.ts',
+      dependencies: ['proxy-setup'],
       // Requires test servers: bash .github/workflows/proxy-tests-macos.sh
     }
   ],
