@@ -307,8 +307,7 @@ runs:
         $certDir = "$(Get-Location)\tests\proxy\server\certs"
         Write-Host "Downloading badssl client certificate..."
         Invoke-WebRequest -Uri "https://badssl.com/certs/badssl.com-client.p12" -OutFile "$certDir\badssl-client.p12" -UseBasicParsing -ErrorAction SilentlyContinue
-        Invoke-WebRequest -Uri "https://badssl.com/certs/badssl.com-client.pem" -OutFile "$certDir\badssl-client.pem" -UseBasicParsing -ErrorAction SilentlyContinue
-        if (Test-Path "$certDir\badssl-client.pem") {
+        if (Test-Path "$certDir\badssl-client.p12") {
           Write-Host "badssl client cert downloaded to $certDir"
         } else {
           Write-Host "WARNING: Failed to download badssl client certificate"

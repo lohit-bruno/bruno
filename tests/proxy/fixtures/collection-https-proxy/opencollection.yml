@@ -23,8 +23,9 @@ config:
       pkcs12FilePath: ../../server/certs/client.p12
       passphrase: bruno-test
     - domain: client.badssl.com
-      type: pem
-      certFilePath: ../../server/certs/badssl-client.pem
+      type: pkcs12
+      pkcs12FilePath: ../../server/certs/badssl-client.p12
+      passphrase: badssl.com
 bundled: false
 extensions:
   bruno:
