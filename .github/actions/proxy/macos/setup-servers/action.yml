@@ -252,3 +252,16 @@ runs:
         cat "$CERT_DIR/server.pem" > "$BUNDLE"
         cat "$SQUID_CERT_DIR/squid.crt" >> "$BUNDLE"
         echo "CA bundle written to $BUNDLE"
+
+    - name: Download badssl client certificate
+      shell: bash
+      run: |
+        CERT_DIR="$(pwd)/tests/proxy/server/certs"
+        echo "Downloading badssl client certificate..."
+        curl -fsSL -o "$CERT_DIR/badssl-client.p12" https://badssl.com/certs/badssl.com-client.p12 || true
+        curl -fsSL -o "$CERT_DIR/badssl-client.pem" https://badssl.com/certs/badssl.com-client.pem || true
+        if [ -f "$CERT_DIR/badssl-client.pem" ]; then
+          echo "badssl client cert downloaded to $CERT_DIR"
+        else
+          echo "WARNING: Failed to download badssl client certificate"
+        fi

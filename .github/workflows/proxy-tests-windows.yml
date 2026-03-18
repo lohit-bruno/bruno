@@ -152,17 +152,10 @@ jobs:
           # 1.5. Download badssl client certificate
           # =================================================================
           Write-Host "==> Downloading badssl client certificate..."
-          $badssl_p12_url = "https://badssl.com/certs/badssl.com-client.p12"
-          $badssl_pem_url = "https://badssl.com/certs/badssl.com-client.pem"
-
-          $badssl_p12 = "$certDir\badssl-client.p12"
-          $badssl_pem = "$certDir\badssl-client.pem"
-
-          Invoke-WebRequest -Uri $badssl_p12_url -OutFile $badssl_p12 -UseBasicParsing -ErrorAction SilentlyContinue
-          Invoke-WebRequest -Uri $badssl_pem_url -OutFile $badssl_pem -UseBasicParsing -ErrorAction SilentlyContinue
-
-          if ((Test-Path $badssl_p12) -or (Test-Path $badssl_pem)) {
-            Write-Host "Successfully downloaded badssl client certificate"
+          Invoke-WebRequest -Uri "https://badssl.com/certs/badssl.com-client.p12" -OutFile "$certDir\badssl-client.p12" -UseBasicParsing -ErrorAction SilentlyContinue
+          Invoke-WebRequest -Uri "https://badssl.com/certs/badssl.com-client.pem" -OutFile "$certDir\badssl-client.pem" -UseBasicParsing -ErrorAction SilentlyContinue
+          if (Test-Path "$certDir\badssl-client.pem") {
+            Write-Host "badssl client cert downloaded"
           } else {
             Write-Host "WARNING: Failed to download badssl client certificate"
           }
@@ -321,8 +314,6 @@ jobs:
           # =================================================================
           $failures = 0
 
-          $badssl_pem = "$certDir\badssl-client.pem"
-
           foreach ($sandbox in @("safe", "developer")) {
             Write-Host ""
             Write-Host "========================================"
@@ -331,28 +322,22 @@ jobs:
 
             Write-Host "--- No proxy: run all requests ---"
             Push-Location tests\proxy\fixtures\collection-no-proxy
-            if (Test-Path $badssl_pem) { $env:BRUNO_CLIENT_CERT = $badssl_pem }
             node $BRU run ./ --env prod --output "junit1-${sandbox}.xml" --insecure --sandbox $sandbox --format junit
             if ($LASTEXITCODE -ne 0) { $failures++ }
             node $BRU run ./https.yml --env prod --output "junit2-${sandbox}.xml" --cacert "$certDir\server.pem" --ignore-truststore --sandbox $sandbox --format junit
             if ($LASTEXITCODE -ne 0) { $failures++ }
-            Remove-Item Env:\BRUNO_CLIENT_CERT -ErrorAction SilentlyContinue
             Pop-Location
 
             Write-Host "--- HTTP proxy: run all requests ---"
             Push-Location tests\proxy\fixtures\collection-http-proxy
-            if (Test-Path $badssl_pem) { $env:BRUNO_CLIENT_CERT = $badssl_pem }
             node $BRU run ./ --env prod --output "junit-${sandbox}.xml" --cacert "$certDir\ca-bundle.pem" --sandbox $sandbox --format junit
             if ($LASTEXITCODE -ne 0) { $failures++ }
-            Remove-Item Env:\BRUNO_CLIENT_CERT -ErrorAction SilentlyContinue
             Pop-Location
 
             Write-Host "--- HTTPS proxy: run all requests ---"
             Push-Location tests\proxy\fixtures\collection-https-proxy
-            if (Test-Path $badssl_pem) { $env:BRUNO_CLIENT_CERT = $badssl_pem }
             node $BRU run ./ --env prod --output "junit-${sandbox}.xml" --cacert "$certDir\ca-bundle.pem" --sandbox $sandbox --format junit
             if ($LASTEXITCODE -ne 0) { $failures++ }
-            Remove-Item Env:\BRUNO_CLIENT_CERT -ErrorAction SilentlyContinue
             Pop-Location
 
             Write-Host "--- --noproxy: bypass collection proxy ---"

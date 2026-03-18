@@ -33,6 +33,7 @@ export default defineConfig({
     {
       name: 'proxy',
       testDir: './tests/proxy',
+      globalSetup: './tests/proxy/global-setup.ts',
       // Requires test servers: bash .github/workflows/proxy-tests-macos.sh
     }
   ],

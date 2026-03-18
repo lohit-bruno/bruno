@@ -300,3 +300,16 @@ runs:
         # Combine HTTPS server cert and Squid proxy cert into a single CA bundle
         Get-Content "$certDir\server.pem", "$squidCertDir\squid.crt" | Set-Content $bundle
         Write-Host "CA bundle written to $bundle"
+
+    - name: Download badssl client certificate
+      shell: pwsh
+      run: |
+        $certDir = "$(Get-Location)\tests\proxy\server\certs"
+        Write-Host "Downloading badssl client certificate..."
+        Invoke-WebRequest -Uri "https://badssl.com/certs/badssl.com-client.p12" -OutFile "$certDir\badssl-client.p12" -UseBasicParsing -ErrorAction SilentlyContinue
+        Invoke-WebRequest -Uri "https://badssl.com/certs/badssl.com-client.pem" -OutFile "$certDir\badssl-client.pem" -UseBasicParsing -ErrorAction SilentlyContinue
+        if (Test-Path "$certDir\badssl-client.pem") {
+          Write-Host "badssl client cert downloaded to $certDir"
+        } else {
+          Write-Host "WARNING: Failed to download badssl client certificate"
+        }

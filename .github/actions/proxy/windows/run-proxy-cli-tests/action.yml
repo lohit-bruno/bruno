@@ -20,7 +20,7 @@ runs:
           if ($LASTEXITCODE -ne 0) { throw "CLI run failed (--sandbox $sandbox)" }
           [xml]$xml = Get-Content "junit1-${sandbox}.xml"
           $count = ($xml.SelectNodes('//testsuite[@errors="0"]')).Count
-          if ($count -ne 5) { throw "Expected 5 passing testsuites, got $count (--sandbox $sandbox)" }
+          if ($count -ne 6) { throw "Expected 6 passing testsuites, got $count (--sandbox $sandbox)" }
 
           Write-Host "=== no proxy: HTTPS with cacert (--sandbox $sandbox) ==="
           node $BRU run ./https.yml --env prod --output "junit2-${sandbox}.xml" --cacert "$CERT_DIR\server.pem" --ignore-truststore --sandbox $sandbox --format junit
@@ -47,7 +47,7 @@ runs:
           if ($LASTEXITCODE -ne 0) { throw "CLI run failed (--sandbox $sandbox)" }
           [xml]$xml = Get-Content "junit-${sandbox}.xml"
           $count = ($xml.SelectNodes('//testsuite[@errors="0"]')).Count
-          if ($count -ne 5) { throw "Expected 5 passing testsuites, got $count (--sandbox $sandbox)" }
+          if ($count -ne 6) { throw "Expected 6 passing testsuites, got $count (--sandbox $sandbox)" }
         }
 
     - name: Run collection-level HTTPS proxy CLI tests
@@ -67,7 +67,7 @@ runs:
           if ($LASTEXITCODE -ne 0) { throw "CLI run failed (--sandbox $sandbox)" }
           [xml]$xml = Get-Content "junit-${sandbox}.xml"
           $count = ($xml.SelectNodes('//testsuite[@errors="0"]')).Count
-          if ($count -ne 5) { throw "Expected 5 passing testsuites, got $count (--sandbox $sandbox)" }
+          if ($count -ne 6) { throw "Expected 6 passing testsuites, got $count (--sandbox $sandbox)" }
         }
 
     - name: Run --noproxy flag CLI tests
@@ -86,5 +86,5 @@ runs:
           if ($LASTEXITCODE -ne 0) { throw "CLI run failed (--sandbox $sandbox)" }
           [xml]$xml = Get-Content "junit-noproxy-${sandbox}.xml"
           $count = ($xml.SelectNodes('//testsuite[@errors="0"]')).Count
-          if ($count -ne 5) { throw "Expected 5 passing testsuites, got $count (--sandbox $sandbox)" }
+          if ($count -ne 6) { throw "Expected 6 passing testsuites, got $count (--sandbox $sandbox)" }
         }

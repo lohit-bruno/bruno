@@ -16,7 +16,7 @@ runs:
         for SANDBOX in safe developer; do
           echo "=== no proxy: run all requests (--sandbox $SANDBOX) ==="
           node "$BRU" run ./ --env prod --output junit1-${SANDBOX}.xml --insecure --sandbox "$SANDBOX" --format junit
-          xmllint --xpath 'count(//testsuite[@errors="0"])' junit1-${SANDBOX}.xml | grep -q "^5$" || exit 1
+          xmllint --xpath 'count(//testsuite[@errors="0"])' junit1-${SANDBOX}.xml | grep -q "^6$" || exit 1
 
           echo "=== no proxy: HTTPS with cacert (--sandbox $SANDBOX) ==="
           node "$BRU" run ./https.yml --env prod --output junit2-${SANDBOX}.xml --cacert "$CERT_DIR/server.pem" --ignore-truststore --sandbox "$SANDBOX" --format junit
@@ -36,7 +36,7 @@ runs:
         for SANDBOX in safe developer; do
           echo "=== HTTP proxy: run all requests (--sandbox $SANDBOX) ==="
           node "$BRU" run ./ --env prod --output junit-${SANDBOX}.xml --cacert "$CERT_DIR/ca-bundle.pem" --sandbox "$SANDBOX" --format junit
-          xmllint --xpath 'count(//testsuite[@errors="0"])' junit-${SANDBOX}.xml | grep -q "^5$" || exit 1
+          xmllint --xpath 'count(//testsuite[@errors="0"])' junit-${SANDBOX}.xml | grep -q "^6$" || exit 1
         done
 
     - name: Run collection-level HTTPS proxy CLI tests
@@ -52,7 +52,7 @@ runs:
         for SANDBOX in safe developer; do
           echo "=== HTTPS proxy: run all requests (--sandbox $SANDBOX) ==="
           node "$BRU" run ./ --env prod --output junit-${SANDBOX}.xml --cacert "$CERT_DIR/ca-bundle.pem" --sandbox "$SANDBOX" --format junit
-          xmllint --xpath 'count(//testsuite[@errors="0"])' junit-${SANDBOX}.xml | grep -q "^5$" || exit 1
+          xmllint --xpath 'count(//testsuite[@errors="0"])' junit-${SANDBOX}.xml | grep -q "^6$" || exit 1
         done
 
     - name: Run --noproxy flag CLI tests
@@ -67,5 +67,5 @@ runs:
         for SANDBOX in safe developer; do
           echo "=== --noproxy: bypass collection proxy (--sandbox $SANDBOX) ==="
           node "$BRU" run ./ --env prod --output junit-noproxy-${SANDBOX}.xml --noproxy --insecure --sandbox "$SANDBOX" --format junit
-          xmllint --xpath 'count(//testsuite[@errors="0"])' junit-noproxy-${SANDBOX}.xml | grep -q "^5$" || exit 1
+          xmllint --xpath 'count(//testsuite[@errors="0"])' junit-noproxy-${SANDBOX}.xml | grep -q "^6$" || exit 1
         done
