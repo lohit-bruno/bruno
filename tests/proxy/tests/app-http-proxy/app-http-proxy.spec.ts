@@ -14,7 +14,7 @@ test.describe('App-level HTTP proxy (collection inherits)', () => {
     // 6 requests: http, https, http_example, https_example, https_client_cert, https_badssl_client_cert
     await validateRunnerResults(page, {
       totalRequests: 6,
-      passed: 5,
+      passed: 6,
       failed: 0
     });
 

@@ -3,24 +3,6 @@ import { setSandboxMode, selectEnvironment, runCollection, validateRunnerResults
 
 test.describe('PFX client cert with empty CA and no default certs', () => {
   test('HTTPS requests with PFX succeed when ca resolves to empty', async ({ pageWithUserData: page }) => {
-    // This test verifies the fix for the ca=[] bug in cert-utils.js / http-https-agents.ts.
-    //
-    // Setup: sslVerification=true, customCaCert=empty file, keepDefaultCerts=false
-    // This makes getCACertificates return caCertificates='' (empty string).
-    //
-    // Before fix: ca = '' || [] → [] (truthy empty array).
-    //   With PFX present, applySecureContext calls tls.createSecureContext({ pfx })
-    //   which starts with an EMPTY CA store (no OpenSSL defaults), then iterates
-    //   the empty ca array adding nothing. rejectUnauthorized=true → server cert
-    //   verification fails because no CAs are trusted.
-    //
-    // After fix: ca = '' || undefined → undefined (falsy).
-    //   applySecureContext is skipped entirely. The agent receives the raw pfx option
-    //   and Node.js uses its default tls.rootCertificates for server verification.
-    //
-    // Uses collection_with_http_proxy which has 6 requests:
-    //   http, https (local), http_example, https_example, https_client_cert (local), https_badssl_client_cert (badssl.com)
-    //
     // Expected: 4 pass, 2 fail
     //   - http, http_example: pass (no TLS)
     //   - https (local:8071): fails (self-signed cert not in Node root CAs — expected)

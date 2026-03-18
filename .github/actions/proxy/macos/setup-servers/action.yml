@@ -1,266 +1,29 @@
 name: 'Setup Proxy Test Servers - macOS'
-description: 'Generate certs and start HTTP, HTTPS, and Squid proxy servers for proxy tests on macOS'
+description: 'Start HTTP, HTTPS, and Squid proxy servers for proxy tests on macOS'
 runs:
   using: 'composite'
   steps:
-    - name: Generate HTTPS server certificate
+    - name: Start all proxy test servers
       shell: bash
       run: |
-        set -euo pipefail
-        CERT_DIR="$(pwd)/tests/proxy/server/certs"
-        mkdir -p "$CERT_DIR"
-
-        openssl req -x509 -newkey rsa:2048 \
-          -keyout "$CERT_DIR/server.key" \
-          -out "$CERT_DIR/server.crt" \
-          -days 3650 -nodes \
-          -subj "/CN=localhost" \
-          -addext "subjectAltName=IP:127.0.0.1,DNS:localhost" 2>/dev/null
-
-        openssl x509 -in "$CERT_DIR/server.crt" -out "$CERT_DIR/server.pem" -outform PEM
-        echo "HTTPS server cert written to $CERT_DIR"
-
-    - name: Generate Squid proxy certificate
-      shell: bash
-      run: |
-        set -euo pipefail
-        SQUID_CERT_DIR="$(pwd)/tests/proxy/server/certs"
-        mkdir -p "$SQUID_CERT_DIR"
-
-        openssl req -x509 -newkey rsa:2048 \
-          -keyout "$SQUID_CERT_DIR/squid.key" \
-          -out "$SQUID_CERT_DIR/squid.crt" \
-          -days 3650 -nodes \
-          -subj "/CN=squid-proxy" \
-          -addext "subjectAltName=IP:127.0.0.1,DNS:localhost" 2>/dev/null
-
-        # Squid https_port expects key + cert in a single PEM file
-        cat "$SQUID_CERT_DIR/squid.key" "$SQUID_CERT_DIR/squid.crt" > "$SQUID_CERT_DIR/squid.pem"
-        echo "Squid cert written to $SQUID_CERT_DIR"
-
-    - name: Generate client certificate for mTLS tests
-      shell: bash
-      run: |
-        set -euo pipefail
-        CERT_DIR="$(pwd)/tests/proxy/server/certs"
-
-        # Client CA
-        openssl req -x509 -newkey rsa:2048 \
-          -keyout "$CERT_DIR/client-ca.key" \
-          -out "$CERT_DIR/client-ca.crt" \
-          -days 3650 -nodes \
-          -subj "/CN=Bruno Test Client CA" 2>/dev/null
-
-        # Client cert signed by client CA
-        openssl req -newkey rsa:2048 \
-          -keyout "$CERT_DIR/client.key" \
-          -out "$CERT_DIR/client.csr" \
-          -nodes -subj "/CN=Bruno Test Client" 2>/dev/null
-
-        openssl x509 -req \
-          -in "$CERT_DIR/client.csr" \
-          -CA "$CERT_DIR/client-ca.crt" \
-          -CAkey "$CERT_DIR/client-ca.key" \
-          -CAcreateserial \
-          -out "$CERT_DIR/client.crt" \
-          -days 3650 2>/dev/null
-
-        # PKCS12 bundle for Bruno client cert config
-        openssl pkcs12 -export \
-          -out "$CERT_DIR/client.p12" \
-          -inkey "$CERT_DIR/client.key" \
-          -in "$CERT_DIR/client.crt" \
-          -certpbe PBE-SHA1-3DES -keypbe PBE-SHA1-3DES -macalg sha1 \
-          -passout pass:bruno-test
-
-        # Empty CA cert file (needed by ca=[] regression test)
-        touch "$CERT_DIR/empty-ca.pem"
-
-        echo "Client cert written to $CERT_DIR"
-
-    - name: Start HTTP server
-      shell: bash
-      run: |
-        set -euo pipefail
-        node tests/proxy/server/http-server.js &
-        echo "HTTP server started (PID $!)"
-
-    - name: Start HTTPS server
-      shell: bash
-      run: |
-        set -euo pipefail
-        CERT_DIR="$(pwd)/tests/proxy/server/certs" \
-          node tests/proxy/server/https-server.js &
-        echo "HTTPS server started (PID $!)"
-
-    - name: Start HTTPS client-cert server
-      shell: bash
-      run: |
-        set -euo pipefail
-        CERT_DIR="$(pwd)/tests/proxy/server/certs" \
-          node tests/proxy/server/https-client-cert-server.js &
-        echo "HTTPS client-cert server started (PID $!)"
-
-    - name: Create Squid htpasswd and config
-      shell: bash
-      run: |
-        set -euo pipefail
-
-        SQUID_WORK_DIR="/tmp/squid-bruno-work"
-        mkdir -p "$SQUID_WORK_DIR/log"
-
-        # Create htpasswd for basic auth (no sudo — write to temp dir)
-        HTPASSWD_FILE="$SQUID_WORK_DIR/htpasswd"
-        if command -v htpasswd &>/dev/null; then
-          htpasswd -bc "$HTPASSWD_FILE" user password 2>/dev/null
-        else
-          HASH=$(openssl passwd -apr1 password)
-          echo "user:$HASH" > "$HTPASSWD_FILE"
-        fi
-        echo "htpasswd created at $HTPASSWD_FILE (user:password)"
-
-        # Find the basic_ncsa_auth helper
-        NCSA_AUTH=$(find /usr /opt/homebrew /usr/local -name "basic_ncsa_auth" -type f 2>/dev/null | head -1 || true)
-        if [ -z "$NCSA_AUTH" ]; then
-          echo "ERROR: basic_ncsa_auth not found" && exit 1
-        fi
-        echo "Found basic_ncsa_auth at: $NCSA_AUTH"
-
-        CERT_DIR="$(pwd)/tests/proxy/server/certs"
-        SQUID_CERT="$CERT_DIR/squid.pem"
-        SQUID_CONF="$SQUID_WORK_DIR/squid.conf"
-
-        # Detect squid version to use correct https_port syntax
-        SQUID_MAJOR=$(squid -v 2>&1 | grep -oE 'Version [0-9]+' | grep -oE '[0-9]+' | head -1 || echo "5")
-        echo "Squid major version: $SQUID_MAJOR"
-
-        if [ "$SQUID_MAJOR" -ge 6 ]; then
-          # Squid 6+ uses separate tls-cert= and tls-key= instead of combined cert=
-          HTTPS_PORT_LINE="https_port 8091 tls-cert=$CERT_DIR/squid.crt tls-key=$CERT_DIR/squid.key"
-        else
-          HTTPS_PORT_LINE="https_port 8091 cert=$SQUID_CERT"
-        fi
-
-        # Replace placeholders in squid.conf
-        sed -e "s|https_port 8091 cert=@SQUID_CERT@|$HTTPS_PORT_LINE|g" \
-            -e "s|@SQUID_CERT@|$SQUID_CERT|g" \
-            -e "s|/usr/lib/squid/basic_ncsa_auth|$NCSA_AUTH|g" \
-            -e "s|/etc/squid/htpasswd|$HTPASSWD_FILE|g" \
-            -e "s|/var/log/squid|$SQUID_WORK_DIR/log|g" \
-            -e "s|cache_log /dev/null|cache_log $SQUID_WORK_DIR/log/cache.log|g" \
-          tests/proxy/server/squid.conf > "$SQUID_CONF"
-
-        # Append runtime overrides
-        cat >> "$SQUID_CONF" <<EOF
-        pid_filename $SQUID_WORK_DIR/squid.pid
-        coredump_dir $SQUID_WORK_DIR
-        visible_hostname localhost
-        hosts_file /etc/hosts
-        EOF
-
-        echo "Squid config written to $SQUID_CONF"
-
-    - name: Start Squid proxy
-      shell: bash
-      run: |
-        set -euo pipefail
-        SQUID_WORK_DIR="/tmp/squid-bruno-work"
-        # Squid 7 sizes its FD hash table from getrlimit(). When ulimit -n is
-        # "unlimited" the allocation overflows and squid aborts. Cap it.
+        # macOS Squid 7 needs FD limit cap
         ulimit -n 4096
-        # macOS shm_open() limits names to 31 chars (PSHMNAMLEN). Use -n to
-        # set a short service name so segment names fit.
-        squid -N -n sq -f "$SQUID_WORK_DIR/squid.conf" &
-        echo "Squid started (PID $!)"
+        node tests/proxy/server/index.js > /tmp/proxy-servers.log 2>&1 &
+        echo "Proxy servers starting (PID $!)..."
 
-    - name: Wait for HTTP server
-      shell: bash
-      run: |
-        set -euo pipefail
-        echo "Waiting for HTTP server on :8070..."
-        for i in $(seq 1 30); do
-          curl -sf http://localhost:8070/ > /dev/null && echo "HTTP server ready" && exit 0
+        # Wait for health checks to complete (index.js logs "All servers ready!")
+        for i in $(seq 1 60); do
+          if grep -q "All servers ready" /tmp/proxy-servers.log 2>/dev/null; then
+            echo "All proxy test servers are ready"
+            exit 0
+          fi
+          if grep -q "FATAL" /tmp/proxy-servers.log 2>/dev/null; then
+            echo "Server setup failed:"
+            cat /tmp/proxy-servers.log
+            exit 1
+          fi
           sleep 2
         done
-        echo "HTTP server did not become ready" && exit 1
-
-    - name: Wait for HTTPS server
-      shell: bash
-      run: |
-        set -euo pipefail
-        CERT_DIR="$(pwd)/tests/proxy/server/certs"
-        echo "Waiting for HTTPS server on :8071..."
-        for i in $(seq 1 30); do
-          curl -sf --cacert "$CERT_DIR/server.pem" https://localhost:8071/ > /dev/null \
-            && echo "HTTPS server ready" && exit 0
-          sleep 2
-        done
-        echo "HTTPS server did not become ready" && exit 1
-
-    - name: Wait for HTTPS client-cert server
-      shell: bash
-      run: |
-        set -euo pipefail
-        CERT_DIR="$(pwd)/tests/proxy/server/certs"
-        echo "Waiting for HTTPS client-cert server on :8072..."
-        for i in $(seq 1 30); do
-          curl -sf --cacert "$CERT_DIR/server.pem" \
-            --cert "$CERT_DIR/client.crt" --key "$CERT_DIR/client.key" \
-            https://localhost:8072/ > /dev/null \
-            && echo "HTTPS client-cert server ready" && exit 0
-          sleep 2
-        done
-        echo "HTTPS client-cert server did not become ready" && exit 1
-
-    - name: Wait for Squid HTTP proxy
-      shell: bash
-      run: |
-        set -euo pipefail
-        echo "Waiting for Squid HTTP proxy on :8090..."
-        for i in $(seq 1 30); do
-          curl -sf --proxy http://user:password@127.0.0.1:8090 http://localhost:8070/ > /dev/null \
-            && echo "Squid HTTP proxy ready" && exit 0
-          sleep 2
-        done
-        echo "Squid HTTP proxy did not become ready" && exit 1
-
-    - name: Wait for Squid HTTPS proxy
-      shell: bash
-      run: |
-        set -euo pipefail
-        SQUID_CERT_DIR="$(pwd)/tests/proxy/server/certs"
-        echo "Waiting for Squid HTTPS proxy on :8091..."
-        for i in $(seq 1 30); do
-          curl -sf \
-            --proxy https://user:password@127.0.0.1:8091 \
-            --proxy-cacert "$SQUID_CERT_DIR/squid.crt" \
-            http://localhost:8070/ > /dev/null \
-            && echo "Squid HTTPS proxy ready" && exit 0
-          sleep 2
-        done
-        echo "Squid HTTPS proxy did not become ready" && exit 1
-
-    - name: Create CA bundle (server + squid proxy certs)
-      shell: bash
-      run: |
-        set -euo pipefail
-        CERT_DIR="$(pwd)/tests/proxy/server/certs"
-        SQUID_CERT_DIR="$(pwd)/tests/proxy/server/certs"
-        BUNDLE="$CERT_DIR/ca-bundle.pem"
-
-        # Combine HTTPS server cert and Squid proxy cert into a single CA bundle
-        cat "$CERT_DIR/server.pem" > "$BUNDLE"
-        cat "$SQUID_CERT_DIR/squid.crt" >> "$BUNDLE"
-        echo "CA bundle written to $BUNDLE"
-
-    - name: Download badssl client certificate
-      shell: bash
-      run: |
-        CERT_DIR="$(pwd)/tests/proxy/server/certs"
-        echo "Downloading badssl client certificate..."
-        curl -fsSL -o "$CERT_DIR/badssl-client.p12" https://badssl.com/certs/badssl.com-client.p12 || true
-        if [ -f "$CERT_DIR/badssl-client.p12" ]; then
-          echo "badssl client cert downloaded to $CERT_DIR"
-        else
-          echo "WARNING: Failed to download badssl client certificate"
-        fi
+        echo "Timed out waiting for servers:"
+        cat /tmp/proxy-servers.log
+        exit 1
