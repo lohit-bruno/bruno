@@ -1,0 +1,34 @@
+info:
+  name: Duplicate Keys
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: https://echo.usebruno.com
+  headers:
+    - name: Content-Type
+      value: application/x-www-form-urlencoded
+  body:
+    type: form-urlencoded
+    data:
+      - name: tags
+        value: frontend
+      - name: tags
+        value: api
+      - name: user
+        value: john
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        test('Response body matches expected value', function () {
+            expect(res.getBody()).to.eql("tags=frontend&tags=api&user=john");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

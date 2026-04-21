@@ -1,0 +1,35 @@
+info:
+  name: setTimeout
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{host}}/ping"
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        bru.setVar("test-js-set-timeout", "");
+        await new Promise((resolve, reject) => {
+          setTimeout(() => {
+            bru.setVar("test-js-set-timeout", "bruno");
+            resolve();
+          }, 1000);
+        });
+
+        const v = bru.getVar("test-js-set-timeout");
+        bru.setVar("test-js-set-timeout", v + "-is-awesome");
+    - type: tests
+      code: |-
+        test("setTimeout()", function() {
+          const v = bru.getVar("test-js-set-timeout")
+          expect(v).to.eql("bruno-is-awesome");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

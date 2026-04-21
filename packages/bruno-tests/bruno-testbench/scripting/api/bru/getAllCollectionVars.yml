@@ -1,0 +1,35 @@
+info:
+  name: getAllCollectionVars
+  type: http
+  seq: 29
+
+http:
+  method: GET
+  url: "{{host}}/ping"
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        bru.setCollectionVar("testCollectionA", "valueA");
+        bru.setCollectionVar("testCollectionB", "valueB");
+    - type: tests
+      code: |-
+        test("should return all collection vars", function() {
+          const vars = bru.getAllCollectionVars();
+          expect(vars.testCollectionA).to.equal("valueA");
+          expect(vars.testCollectionB).to.equal("valueB");
+        });
+
+        test("should return a shallow copy", function() {
+          const vars = bru.getAllCollectionVars();
+          vars.testCollectionA = "mutated";
+          const vars2 = bru.getAllCollectionVars();
+          expect(vars2.testCollectionA).to.equal("valueA");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

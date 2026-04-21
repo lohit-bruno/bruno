@@ -1,0 +1,33 @@
+info:
+  name: getHeader
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{host}}/api/echo/json"
+  body:
+    type: json
+    data: |-
+      {
+        "hello": "bruno"
+      }
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("res.getHeader(name)", function() {
+          const server = res.getHeader('x-powered-by');
+          expect(server).to.eql('Express');
+        });
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

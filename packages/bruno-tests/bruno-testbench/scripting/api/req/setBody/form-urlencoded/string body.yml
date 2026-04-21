@@ -1,0 +1,33 @@
+info:
+  name: string body
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{echo-host}}"
+  body:
+    type: form-urlencoded
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: req.setBody("key=value&name=bruno");
+    - type: tests
+      code: |-
+        test("req.setBody() with string format - request body", function() {
+          const data = req.getBody();
+          expect(data).to.eql("key=value&name=bruno");
+        });
+
+        test("req.setBody() with string format - response body", function() {
+          const data = res.getBody();
+          expect(data).to.eql("key=value&name=bruno");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

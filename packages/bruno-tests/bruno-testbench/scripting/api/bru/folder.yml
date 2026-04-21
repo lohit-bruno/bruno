@@ -1,0 +1,9 @@
+info:
+  name: bru
+  type: folder
+  seq: 1
+
+request:
+  variables:
+    - name: folder-var
+      value: folder-var-value

@@ -1,0 +1,39 @@
+info:
+  name: undefined
+  type: http
+  seq: 7
+
+http:
+  method: POST
+  url: "{{host}}/api/echo/json"
+  body:
+    type: json
+    data: |-
+      {
+        "hello": "bruno"
+      }
+
+runtime:
+  scripts:
+    - type: after-response
+      code: |-
+        // if undefined  is not passed to res.setBody() the test fails in only safe-mode, needs to check, undefined is not a valid JSON
+        // Safe mode, Dev mode behaves differently, null is getting converted to undefined, although both have null in the response, tests with undefined fails in safe mode, this needs to be investigated, undefined is not a valid JSON
+        res.setBody(undefined)
+    - type: tests
+      code: |-
+        test("res.setBody(undefined)", function() {
+          const body = res.getBody();
+        // Safe mode, Dev mode behaves differently, null is getting converted to undefined, although both have null in the response, tests with undefined fails in safe mode, this needs to be investigated, undefined is not a valid JSON
+          expect(body).to.be.undefined;
+        });
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

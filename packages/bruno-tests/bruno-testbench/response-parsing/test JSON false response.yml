@@ -1,0 +1,27 @@
+info:
+  name: test JSON false response
+  type: http
+  seq: 11
+
+http:
+  method: POST
+  url: "{{httpfaker}}/api/echo/custom"
+  body:
+    type: json
+    data: |-
+      {
+        "headers": { "content-type": "application/json" },
+        "content": "false"
+      }
+
+runtime:
+  assertions:
+    - expression: res.body
+      operator: eq
+      value: "false"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

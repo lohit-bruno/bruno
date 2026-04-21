@@ -1,0 +1,21 @@
+info:
+  name: "2"
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: https://echo.usebruno.com
+
+runtime:
+  scripts:
+    - type: before-request
+      code: bru.runner.skipRequest();
+    - type: after-response
+      code: bru.setVar('bru.runner.skipRequest', false);
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,24 @@
+info:
+  name: get-url-string
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: https://echo.usebruno.com
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        await test("send request with a get url string", async () => {
+          const res = await bru.sendRequest("https://testbench-sanity.usebruno.com/ping");
+          expect(res.data).to.eql('pong');
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

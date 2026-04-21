@@ -1,0 +1,27 @@
+info:
+  name: deleteGlobalEnvVar
+  type: http
+  seq: 19
+
+http:
+  method: GET
+  url: "{{host}}/ping"
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        bru.setGlobalEnvVar("testDeleteGlobalEnvVar", "to-be-deleted");
+        bru.deleteGlobalEnvVar("testDeleteGlobalEnvVar");
+    - type: tests
+      code: |-
+        test("should delete global env var", function() {
+          const val = bru.getGlobalEnvVar("testDeleteGlobalEnvVar");
+          expect(val).to.be.undefined;
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

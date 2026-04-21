@@ -1,0 +1,35 @@
+info:
+  name: Bearer Auth undefined
+  type: http
+  seq: 2
+
+http:
+  method: GET
+  url: "{{host}}/api/auth/bearer/protected"
+  headers:
+    - name: Authorization
+      value: Bearer {{bearer_auth_token}}
+  auth:
+    type: bearer
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("selected auth overrides Authorization header always", function() {
+          const authHeader =  req.getHeader("Authorization")
+          expect(authHeader).to.eql("Bearer ")
+        })
+  assertions:
+    - expression: res.body.message
+      operator: eq
+      value: Unauthorized
+    - expression: res.status
+      operator: eq
+      value: "401"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

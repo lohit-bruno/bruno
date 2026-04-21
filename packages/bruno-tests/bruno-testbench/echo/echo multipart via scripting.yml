@@ -1,0 +1,29 @@
+info:
+  name: echo multipart via scripting
+  type: http
+  seq: 10
+
+http:
+  method: POST
+  url: "{{echo-host}}"
+  body:
+    type: multipart-form
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        const FormData = require("form-data");
+        const form = new FormData();
+        form.append('form-data-key', 'form-data-value');
+        req.setBody(form);
+  assertions:
+    - expression: res.body
+      operator: contains
+      value: form-data-value
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

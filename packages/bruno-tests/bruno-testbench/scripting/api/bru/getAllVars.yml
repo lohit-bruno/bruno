@@ -1,0 +1,35 @@
+info:
+  name: getAllVars
+  type: http
+  seq: 24
+
+http:
+  method: GET
+  url: "{{host}}/ping"
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        bru.setVar("testGetAllVarsA", "alphaValue");
+        bru.setVar("testGetAllVarsB", "betaValue");
+    - type: tests
+      code: |-
+        test("should return all runtime vars", function() {
+          const vars = bru.getAllVars();
+          expect(vars.testGetAllVarsA).to.equal("alphaValue");
+          expect(vars.testGetAllVarsB).to.equal("betaValue");
+        });
+
+        test("should return a shallow copy", function() {
+          const vars = bru.getAllVars();
+          vars.testGetAllVarsA = "mutated";
+          const vars2 = bru.getAllVars();
+          expect(vars2.testGetAllVarsA).to.equal("alphaValue");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

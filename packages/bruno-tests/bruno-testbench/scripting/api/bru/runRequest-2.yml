@@ -1,0 +1,25 @@
+info:
+  name: runRequest-2
+  type: http
+  seq: 11
+
+http:
+  method: POST
+  url: "{{echo-host}}"
+  body:
+    type: text
+    data: bruno
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        bru.setVar('run-request-runtime-var', 'run-request-runtime-var-value');
+        bru.setEnvVar('run-request-env-var', 'run-request-env-var-value');
+        bru.setGlobalEnvVar('run-request-global-env-var', 'run-request-global-env-var-value');
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

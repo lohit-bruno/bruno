@@ -1,0 +1,30 @@
+info:
+  name: getStatus
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{host}}/ping"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("res.getStatus()", function() {
+          const status = res.getStatus()
+          expect(status).to.equal(200);
+        });
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body
+      operator: eq
+      value: pong
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,59 @@
+info:
+  name: Test Multipart Redirect Multiple Fields
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{localhost}}/api/redirect/multipart-redirect-source"
+  body:
+    type: multipart-form
+    data:
+      - name: field1
+        type: text
+        value: value1
+      - name: field2
+        type: text
+        value: value2
+      - name: field3
+        type: text
+        value: value3
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("should successfully redirect complex multipart form data with 308", function() {
+          const data = res.getBody();
+          expect(data).to.be.an('object');
+          expect(data.status).to.equal('success');
+          expect(data.method).to.equal('POST');
+        });
+
+        test("should preserve POST method during redirect", function() {
+          const data = res.getBody();
+          expect(data.method).to.equal('POST');
+        });
+
+        test("should receive all text fields at target endpoint", function() {
+          const data = res.getBody();
+          expect(data.body).to.have.property('field1');
+          expect(data.body).to.have.property('field2');
+          expect(data.body).to.have.property('field3');
+        });
+
+        test("should maintain content-type header during redirect", function() {
+          const data = res.getBody();
+          expect(data.headers).to.have.property('content-type');
+          expect(data.headers['content-type']).to.include('multipart/form-data');
+        });
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

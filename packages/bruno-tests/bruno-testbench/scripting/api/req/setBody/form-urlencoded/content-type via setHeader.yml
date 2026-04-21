@@ -1,0 +1,41 @@
+info:
+  name: content-type via setHeader
+  type: http
+  seq: 7
+
+http:
+  method: POST
+  url: "{{echo-host}}"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        req.setHeader('content-type', 'application/x-www-form-urlencoded');
+        req.setBody([
+          {name: "key", value: "value"},
+          {name: "name", value: "bruno"}
+        ]);
+    - type: tests
+      code: |-
+        test("req.setBody() - request body", function() {
+          const data = req.getBody();
+          expect(data).to.eql("key=value&name=bruno");
+        });
+
+        test("req.setBody() - response body", function() {
+          const data = res.getBody();
+          expect(data).to.eql("key=value&name=bruno");
+        });
+
+        test("Content-Type header is set correctly", function() {
+          const contentType = req.getHeader('content-type');
+          expect(contentType).to.eql('application/x-www-form-urlencoded');
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

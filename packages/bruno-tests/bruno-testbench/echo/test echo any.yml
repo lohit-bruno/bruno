@@ -1,0 +1,27 @@
+info:
+  name: test echo any
+  type: http
+  seq: 11
+
+http:
+  method: POST
+  url: "{{httpfaker}}/api/echo/custom"
+  body:
+    type: json
+    data: |-
+      {
+        "headers": { "content-type": "text/plain" },
+        "content": "hello"
+      }
+
+runtime:
+  assertions:
+    - expression: res.body
+      operator: eq
+      value: hello
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,43 @@
+info:
+  name: missing values
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{host}}/api/echo/json?foo={{undefinedVar}}"
+  params:
+    - name: foo
+      value: "{{undefinedVar}}"
+      type: query
+  body:
+    type: json
+    data: |-
+      {
+        "hello": "{{undefinedVar2}}"
+      }
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("should return json", function() {
+          const url = req.getUrl();
+          const query = url.split("?")[1];
+          expect(query).to.equal("foo={{undefinedVar}}");
+
+          const data = res.getBody();
+          expect(res.getBody()).to.eql({
+            "hello": "{{undefinedVar2}}"
+          });
+        });
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

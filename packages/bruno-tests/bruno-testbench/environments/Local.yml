@@ -1,0 +1,66 @@
+name: Local
+variables:
+  - name: host
+    value: http://localhost:8080
+  - name: localhost
+    value: http://localhost:8081
+  - name: httpfaker
+    value: https://www.httpfaker.org
+  - name: bearer_auth_token
+    value: your_secret_token
+  - name: basic_auth_password
+    value: della
+  - name: env.var1
+    value: envVar1
+  - name: env-var2
+    value: envVar2
+  - name: bark
+    value: "{{process.env.PROC_ENV_VAR}}"
+  - name: foo
+    value: bar
+  - name: testSetEnvVar
+    value: bruno-29653
+  - name: echo-host
+    value: https://echo.usebruno.com
+  - name: client_id
+    value: client_id_1
+  - name: client_secret
+    value: client_secret_1
+  - name: auth_url
+    value: http://localhost:8080/api/auth/oauth2/authorization_code/authorize
+  - name: callback_url
+    value: http://localhost:8080/api/auth/oauth2/authorization_code/callback
+  - name: access_token_url
+    value: http://localhost:8080/api/auth/oauth2/authorization_code/token
+  - name: passwordCredentials_username
+    value: foo
+  - name: passwordCredentials_password
+    value: bar
+  - name: github_authorize_url
+    value: https://github.com/login/oauth/authorize
+  - name: github_access_token_url
+    value: https://github.com/login/oauth/access_token
+  - name: google_auth_url
+    value: https://accounts.google.com/o/oauth2/auth
+  - name: google_access_token_url
+    value: https://accounts.google.com/o/oauth2/token
+  - name: google_scope
+    value: https://www.googleapis.com/auth/userinfo.email
+  - secret: true
+    name: github_client_secret
+  - secret: true
+    name: github_client_id
+  - secret: true
+    name: google_client_id
+  - secret: true
+    name: google_client_secret
+  - secret: true
+    name: github_authorization_code
+  - secret: true
+    name: passwordCredentials_access_token
+  - secret: true
+    name: client_credentials_access_token
+  - secret: true
+    name: authorization_code_access_token
+  - secret: true
+    name: github_access_token

@@ -1,0 +1,23 @@
+info:
+  name: getProcessEnv
+  type: http
+  seq: 6
+
+http:
+  method: GET
+  url: "{{host}}/ping"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("bru.getProcessEnv()", function() {
+          const v = bru.getProcessEnv("PROC_ENV_VAR");
+          expect(v).to.equal("woof");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

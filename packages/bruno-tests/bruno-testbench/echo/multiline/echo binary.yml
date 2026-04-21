@@ -1,0 +1,20 @@
+info:
+  name: echo binary
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{echo-host}}"
+  body:
+    type: file
+    data:
+      - filePath: bruno.png
+        contentType: image/png
+        selected: true
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

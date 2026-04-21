@@ -1,0 +1,35 @@
+info:
+  name: deleteHeader
+  type: http
+  seq: 12
+
+http:
+  method: GET
+  url: "{{host}}/ping"
+  headers:
+    - name: bruno
+      value: is-awesome
+
+runtime:
+  scripts:
+    - type: before-request
+      code: req.deleteHeader('bruno');
+    - type: tests
+      code: |-
+        test("req.deleteHeader(name)", function() {
+          const h = req.getHeader('bruno');
+          expect(h).to.be.undefined;
+        });
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body
+      operator: eq
+      value: pong
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

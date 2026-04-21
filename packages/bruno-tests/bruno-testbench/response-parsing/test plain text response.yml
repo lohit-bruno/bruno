@@ -1,0 +1,27 @@
+info:
+  name: test plain text response
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{httpfaker}}/api/echo/custom"
+  body:
+    type: json
+    data: |-
+      {
+        "headers": { "content-type": "text/plain" },
+        "content": "hello"
+      }
+
+runtime:
+  assertions:
+    - expression: res.body
+      operator: eq
+      value: hello
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

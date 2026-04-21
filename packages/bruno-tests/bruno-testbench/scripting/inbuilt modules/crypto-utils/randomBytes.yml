@@ -1,0 +1,35 @@
+info:
+  name: randomBytes
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: https://echo.usebruno.com
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        const { randomBytesFunction, isUint8Array } = require('./scripting/inbuilt modules/utils.js');
+
+        test("should get random byte values", function() {
+          const randomValueUint8Array = randomBytesFunction(32);
+          
+          const isValueUint8Array = isUint8Array(randomValueUint8Array);
+          expect(isValueUint8Array).to.be.true;
+          
+          const plainArray = Array.from(randomValueUint8Array);
+          expect(plainArray).to.be.of.length(32);
+        });
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

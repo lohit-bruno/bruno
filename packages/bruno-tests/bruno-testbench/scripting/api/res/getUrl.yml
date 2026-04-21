@@ -1,0 +1,34 @@
+info:
+  name: getUrl
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{host}}/ping"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("res.url", function() {
+          expect(res.url).to.equal("https://testbench-sanity.usebruno.com/ping");
+        });
+
+        test("res.getUrl()", function() {
+          const url = res.getUrl();
+          expect(url).to.equal("https://testbench-sanity.usebruno.com/ping");
+        });
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body
+      operator: eq
+      value: pong
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

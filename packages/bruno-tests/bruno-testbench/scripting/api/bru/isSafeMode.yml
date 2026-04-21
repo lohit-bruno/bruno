@@ -1,0 +1,23 @@
+info:
+  name: isSafeMode
+  type: http
+  seq: 18
+
+http:
+  method: GET
+  url: "{{host}}/ping"
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        test("bru.isSafeMode() returns true in safe mode", function() {
+            expect(bru.isSafeMode()).to.be.false;
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,48 @@
+info:
+  name: fakerjs
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{host}}/api/echo/json"
+  body:
+    type: json
+    data: |-
+      {
+        "hello": "bruno"
+      }
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        const { faker } = require('@faker-js/faker');
+        const uuid = faker.string.uuid();
+
+        const data = req.getBody();
+        data.uuid = uuid;
+
+        req.setBody(data);
+    - type: tests
+      code: |-
+        test("should return json", function() {
+          const data = res.getBody();
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+          const isUUID = (inputString) => {
+            return uuidRegex.test(inputString);
+          };
+          
+          expect(data.hello).to.equal("bruno");
+          expect(isUUID(data.uuid)).to.be.true;
+        });
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

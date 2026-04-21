@@ -1,0 +1,29 @@
+info:
+  name: Bearer Auth 200
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{host}}/api/auth/bearer/protected"
+  auth:
+    type: bearer
+    token: "{{bearer_auth_token}}"
+
+runtime:
+  scripts:
+    - type: after-response
+      code: bru.setEnvVar("foo", "bar");
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body.message
+      operator: eq
+      value: Authentication successful
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

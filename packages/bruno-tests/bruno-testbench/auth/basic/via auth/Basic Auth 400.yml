@@ -1,0 +1,26 @@
+info:
+  name: Basic Auth 400
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{host}}/api/auth/basic/protected"
+  body:
+    type: json
+    data: ""
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "401"
+    - expression: res.body
+      operator: eq
+      value: Unauthorized
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

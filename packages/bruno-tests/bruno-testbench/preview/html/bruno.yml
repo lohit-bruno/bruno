@@ -1,0 +1,27 @@
+info:
+  name: bruno
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: https://www.usebruno.com
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("should return parsed xml", function() {
+          const headers = res.getHeaders();
+          expect(headers['content-type']).to.eql("text/html; charset=utf-8");
+        });
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

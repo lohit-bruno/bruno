@@ -1,0 +1,51 @@
+info:
+  name: echo form-url-encoded
+  type: http
+  seq: 9
+
+http:
+  method: POST
+  url: "{{echo-host}}"
+  body:
+    type: form-urlencoded
+    data:
+      - name: form-data-key
+        value: "{{form-data-key}}"
+      - name: form-data-stringified-object
+        value: "{{form-data-stringified-object}}"
+      - name: key_1
+        value: value_1
+      - name: key_2
+        value: value_2
+      - name: key_1
+        value: value_3
+      - name: key_2
+        value: value_4
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        let obj = JSON.stringify({foo:123});
+        bru.setVar('form-data-key', 'form-data-value');
+        bru.setVar('form-data-stringified-object', obj);
+    - type: tests
+      code: |-
+        test("form-urlencoded body with variables and duplicate keys", function() {
+          const expected = [
+            "form-data-key=form-data-value",
+            "form-data-stringified-object=%7B%22foo%22%3A123%7D", // {"foo":123} URL encoded
+            "key_1=value_1",
+            "key_2=value_2", 
+            "key_1=value_3", // duplicate key with different value
+            "key_2=value_4"  // duplicate key with different value
+          ].join("&");
+          
+          expect(res.getBody()).to.eql(expected);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

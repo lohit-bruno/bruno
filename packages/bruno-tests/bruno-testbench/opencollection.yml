@@ -1,0 +1,76 @@
+opencollection: 1.0.0
+
+info:
+  name: bruno-testbench-yml
+config:
+  proxy:
+    inherit: false
+    config:
+      protocol: http
+      hostname: "{{proxyHostname}}"
+      port: 4000
+      auth:
+        username: anoop
+        password: password
+        disabled: true
+      bypassProxy: ""
+    disabled: true
+
+request:
+  headers:
+    - name: check
+      value: again
+    - name: token
+      value: "{{collection_pre_var_token}}"
+    - name: collection-header
+      value: collection-header-value
+  auth:
+    type: bearer
+    token: "{{bearer_auth_token}}"
+  variables:
+    - name: collection_pre_var
+      value: collection_pre_var_value
+    - name: collection_pre_var_token
+      value: "{{request_pre_var_token}}"
+    - name: collection-var
+      value: collection-var-value
+  scripts:
+    - type: before-request
+      code: |-
+        // used by `scripting/js/folder-collection script-tests`
+        const shouldTestCollectionScripts = bru.getVar('should-test-collection-scripts');
+        if(shouldTestCollectionScripts) {
+         bru.setVar('collection-var-set-by-collection-script', 'collection-var-value-set-by-collection-script');
+        }
+    - type: tests
+      code: |-
+        // used by `scripting/js/folder-collection script-tests`
+        const shouldTestCollectionScripts = bru.getVar('should-test-collection-scripts');
+        const collectionVar = bru.getVar("collection-var-set-by-collection-script");
+        if (shouldTestCollectionScripts && collectionVar) {
+          test("collection level test - should get the var that was set by the collection script", function() {
+            expect(collectionVar).to.equal("collection-var-value-set-by-collection-script");
+          }); 
+          bru.setVar('collection-var-set-by-collection-script', null); 
+          bru.setVar('should-test-collection-scripts', null);
+        }
+
+docs:
+  content: |-
+    # bruno-testbench 🐶
+
+    This is a test collection that I am using to test various functionalities around bruno
+  type: text/markdown
+bundled: false
+extensions:
+  bruno:
+    ignore:
+      - node_modules
+      - .git
+    scripts:
+       additionalContextRoots:
+         - "../additional-context-root-lib"
+    presets:
+      request:
+        type: http
+        url: http://localhost:6000

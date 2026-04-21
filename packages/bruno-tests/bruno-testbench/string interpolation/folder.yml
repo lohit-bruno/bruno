@@ -1,0 +1,11 @@
+info:
+  name: string interpolation
+  type: folder
+  seq: 1
+
+request:
+  variables:
+    - name: folder_pre_var
+      value: folder_pre_var_value
+    - name: folder_pre_var_2
+      value: "{{env.var1}}"

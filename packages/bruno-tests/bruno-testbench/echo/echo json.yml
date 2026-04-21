@@ -1,0 +1,40 @@
+info:
+  name: echo json
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{host}}/api/echo/json"
+  headers:
+    - name: foo
+      value: bar
+  body:
+    type: json
+    data: |-
+      {
+        "hello": "bruno"
+      }
+
+runtime:
+  scripts:
+    - type: before-request
+      code: bru.setVar("foo", "foo-world-2");
+    - type: tests
+      code: |-
+        test("should return json", function() {
+          const data = res.getBody();
+          expect(res.getBody()).to.eql({
+            "hello": "bruno"
+          });
+        });
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

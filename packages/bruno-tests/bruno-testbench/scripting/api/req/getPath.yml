@@ -1,0 +1,23 @@
+info:
+  name: getPath
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{host}}/api/users/123"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("req.getPath()", function() {
+          const path = req.getPath();
+          expect(path).to.equal("/api/users/123");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

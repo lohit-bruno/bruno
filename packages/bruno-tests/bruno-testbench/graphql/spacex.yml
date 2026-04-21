@@ -1,0 +1,27 @@
+info:
+  name: spacex
+  type: graphql
+  seq: 1
+
+graphql:
+  method: POST
+  url: https://spacex-production.up.railway.app/
+  body:
+    query: |
+      {
+        company {
+          ceo
+        }
+      }
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,27 @@
+info:
+  name: test echo-any json
+  type: http
+  seq: 12
+
+http:
+  method: POST
+  url: "{{httpfaker}}/api/echo/custom"
+  body:
+    type: json
+    data: |-
+      {
+        "type": "application/json",
+        "contentJSON": {"x": 42}
+      }
+
+runtime:
+  assertions:
+    - expression: res.body.x
+      operator: eq
+      value: "42"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

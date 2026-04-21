@@ -1,0 +1,88 @@
+info:
+  name: runRequest
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{host}}/api/echo/json"
+  headers:
+    - name: foo
+      value: bar
+  body:
+    type: json
+    data: |-
+      {
+        "hello": "bruno"
+      }
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        bru.setVar("runRequest-ping-res-1", null);
+        bru.setVar("runRequest-ping-res-2", null);
+        bru.setVar("runRequest-ping-res-3", null);
+
+        let pingRes = await bru.runRequest('ping');
+        bru.setVar('runRequest-ping-res-1', {
+          data: pingRes?.data,
+          statusText: pingRes?.statusText,
+          status: pingRes?.status
+        });
+    - type: after-response
+      code: |-
+        let pingRes = await bru.runRequest('ping');
+        bru.setVar('runRequest-ping-res-2', {
+          data: pingRes?.data,
+          statusText: pingRes?.statusText,
+          status: pingRes?.status
+        });
+    - type: tests
+      code: |-
+        const pingRes = await bru.runRequest('ping');
+        bru.setVar('runRequest-ping-res-3', {
+          data: pingRes?.data,
+          statusText: pingRes?.statusText,
+          status: pingRes?.status
+        });
+
+        test("should run request and return valid response in pre-request script", function() {
+          const expectedPingRes = {
+            data: "pong",
+            statusText: "OK",
+            status: 200
+          };
+          const pingRes = bru.getVar('runRequest-ping-res-1');
+          expect(pingRes).to.eql(expectedPingRes);
+        });
+
+        test("should run request and return valid response in post-response script", function() {
+          const expectedPingRes = {
+            data: "pong",
+            statusText: "OK",
+            status: 200
+          };
+          const pingRes = bru.getVar('runRequest-ping-res-2');
+          expect(pingRes).to.eql(expectedPingRes);
+        });
+
+        test("should run request and return valid response in tests script", function() {
+          const expectedPingRes = {
+            data: "pong",
+            statusText: "OK",
+            status: 200
+          };
+          const pingRes = bru.getVar('runRequest-ping-res-3');
+          expect(pingRes).to.eql(expectedPingRes);
+        });
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

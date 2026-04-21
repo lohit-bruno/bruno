@@ -1,0 +1,40 @@
+info:
+  name: getQueryString
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{host}}/ping?page=1&limit=10&sort=desc"
+  params:
+    - name: page
+      value: "1"
+      type: query
+    - name: limit
+      value: "10"
+      type: query
+    - name: sort
+      value: desc
+      type: query
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("req.getQueryString()", function() {
+          const queryString = req.getQueryString();
+          expect(queryString).to.equal("page=1&limit=10&sort=desc");
+        });
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body
+      operator: eq
+      value: pong
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,30 @@
+info:
+  name: nanoid
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{host}}/ping"
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        const { nanoid } = require("nanoid");
+         
+        bru.setVar("nanoid-test-id", nanoid());
+    - type: tests
+      code: |-
+        test("nanoid var", function() {
+          const id = bru.getVar('nanoid-test-id');
+          let isValidNanoid = /^[a-zA-Z0-9_-]{21}$/.test(id)
+          bru.setVar('nanoid-test-id', null);
+          expect(isValidNanoid).to.eql(true);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

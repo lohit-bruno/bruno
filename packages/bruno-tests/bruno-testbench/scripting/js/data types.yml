@@ -1,0 +1,58 @@
+info:
+  name: data types
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{host}}/api/echo/json"
+  body:
+    type: json
+    data: |-
+      {
+        "boolean": false,
+        "number": 1,
+        "string": "bruno",
+        "array": [1, 2, 3, 4, 5],
+        "object": {
+          "hello": "bruno"
+        },
+        "null": null
+      }
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        const reqBody = req.getBody();
+
+        bru.setVar("dataTypeVarTest", {
+          ...reqBody,
+          "undefined": undefined
+        });
+    - type: tests
+      code: |-
+        test("data types check via bru var", function() {
+          let v = bru.getVar("dataTypeVarTest");
+          v = {
+            ...v,
+            "undefined": undefined
+          };
+          expect(v).to.eql({
+            "boolean": false,
+            "number": 1,
+            "string": "bruno",
+            "array": [1, 2, 3, 4, 5],
+            "object": {
+              "hello": "bruno"
+            },
+            "null": null,
+            "undefined": undefined
+          })
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,72 @@
+info:
+  name: echo numbers
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{echo-host}}"
+  body:
+    type: json
+    data: |-
+      {
+        "integer": 123,
+        "negativeInteger": -99,
+        "zero": 0,
+        "float": 2.718,
+        "negativeFloat": -1.618,
+        "largeDouble": 12345.678901234567,
+        "smallDouble": 9.876e-12,
+        "booleanTrue": true,
+        "booleanFalse": false
+      }
+
+runtime:
+  assertions:
+    - expression: res.body.integer
+      operator: eq
+      value: "123"
+    - expression: res.body.integer
+      operator: isNumber
+    - expression: res.body.negativeInteger
+      operator: eq
+      value: "-99"
+    - expression: res.body.negativeInteger
+      operator: isNumber
+    - expression: res.body.zero
+      operator: eq
+      value: "0"
+    - expression: res.body.zero
+      operator: isNumber
+    - expression: res.body.float
+      operator: eq
+      value: "2.718"
+    - expression: res.body.float
+      operator: isNumber
+    - expression: res.body.negativeFloat
+      operator: eq
+      value: "-1.618"
+    - expression: res.body.negativeFloat
+      operator: isNumber
+    - expression: res.body.largeDouble
+      operator: eq
+      value: "12345.678901234567"
+    - expression: res.body.largeDouble
+      operator: isNumber
+    - expression: res.body.smallDouble
+      operator: eq
+      value: "9.876e-12"
+    - expression: res.body.smallDouble
+      operator: isNumber
+    - expression: res.body.booleanTrue
+      operator: eq
+      value: "true"
+    - expression: res.body.booleanFalse
+      operator: eq
+      value: "false"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

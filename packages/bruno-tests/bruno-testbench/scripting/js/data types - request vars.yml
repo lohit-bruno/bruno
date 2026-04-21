@@ -1,0 +1,69 @@
+info:
+  name: data types - request vars
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{host}}/api/echo/json"
+  body:
+    type: json
+    data: |-
+      {
+        "boolean": false,
+        "number_1": 1,
+        "number_2": 0,
+        "number_3": -1,
+        "string": "bruno",
+        "array": [1, 2, 3, 4, 5],
+        "object": {
+          "hello": "bruno"
+        },
+        "null": null
+      }
+
+runtime:
+  assertions:
+    - expression: req.body.boolean
+      operator: isBoolean
+    - expression: req.body.number_1
+      operator: isNumber
+    - expression: req.body.undefined
+      operator: isUndefined
+    - expression: req.body.string
+      operator: isString
+    - expression: req.body.null
+      operator: isNull
+    - expression: req.body.array
+      operator: isArray
+    - expression: req.body.boolean
+      operator: eq
+      value: "false"
+    - expression: req.body.number_1
+      operator: eq
+      value: "1"
+    - expression: req.body.undefined
+      operator: eq
+      value: undefined
+    - expression: req.body.string
+      operator: eq
+      value: bruno
+    - expression: req.body.null
+      operator: eq
+      value: "null"
+    - expression: req.body.number_2
+      operator: eq
+      value: "0"
+    - expression: req.body.number_3
+      operator: eq
+      value: "-1"
+    - expression: req.body.number_2
+      operator: isNumber
+    - expression: req.body.number_3
+      operator: isNumber
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

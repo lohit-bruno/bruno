@@ -1,0 +1,23 @@
+info:
+  name: getCollectionVar
+  type: http
+  seq: 9
+
+http:
+  method: GET
+  url: "{{host}}/ping"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("should get collection var in scripts", function() {
+          const testVar = bru.getCollectionVar("collection-var");
+          expect(testVar).to.equal("collection-var-value");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

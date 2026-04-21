@@ -1,0 +1,25 @@
+info:
+  name: setVar
+  type: http
+  seq: 4
+
+http:
+  method: GET
+  url: "{{host}}/ping"
+
+runtime:
+  scripts:
+    - type: after-response
+      code: bru.setVar("testSetVar", "bruno-test-87267")
+    - type: tests
+      code: |-
+        test("should get var in scripts", function() {
+          const testSetVar = bru.getVar("testSetVar");
+          expect(testSetVar).to.equal("bruno-test-87267");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

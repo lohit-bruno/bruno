@@ -1,0 +1,67 @@
+info:
+  name: timers
+  type: http
+  seq: 5
+
+http:
+  method: GET
+  url: "{{host}}/ping"
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        // Skip in safe mode - these tests require developer sandbox
+        if (bru.isSafeMode()) {
+          bru.runner.skipRequest();
+          return;
+        }
+    - type: tests
+      code: |-
+        test("setTimeout exists and is callable", function() {
+          expect(setTimeout).to.be.a('function');
+          const id = setTimeout(() => {}, 1000);
+          expect(id).to.not.be.undefined;
+          clearTimeout(id);
+        });
+
+        test("clearTimeout exists and works", function() {
+          expect(clearTimeout).to.be.a('function');
+          let fired = false;
+          const id = setTimeout(() => { fired = true; }, 0);
+          clearTimeout(id);
+          // Can't fully verify without async, but clearTimeout should not throw
+          expect(fired).to.equal(false);
+        });
+
+        test("setInterval exists and is callable", function() {
+          expect(setInterval).to.be.a('function');
+          const id = setInterval(() => {}, 1000);
+          expect(id).to.not.be.undefined;
+          clearInterval(id);
+        });
+
+        test("clearInterval exists", function() {
+          expect(clearInterval).to.be.a('function');
+        });
+
+        test("setImmediate exists and is callable", function() {
+          expect(setImmediate).to.be.a('function');
+          const id = setImmediate(() => {});
+          expect(id).to.not.be.undefined;
+          clearImmediate(id);
+        });
+
+        test("clearImmediate exists", function() {
+          expect(clearImmediate).to.be.a('function');
+        });
+
+        test("queueMicrotask exists", function() {
+          expect(queueMicrotask).to.be.a('function');
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

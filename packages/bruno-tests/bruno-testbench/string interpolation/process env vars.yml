@@ -1,0 +1,36 @@
+info:
+  name: process env vars
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{host}}/api/echo/json"
+  body:
+    type: json
+    data: |-
+      {
+        "bark": "{{bark}}",
+        "bark2": "{{process.env.PROC_ENV_VAR}}"
+      }
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("should return json", function() {
+          expect(res.getBody()).to.eql({
+            "bark": "woof",
+            "bark2": "woof"
+          });
+        });
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

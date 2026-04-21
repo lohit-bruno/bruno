@@ -1,0 +1,28 @@
+info:
+  name: getAllEnvVars
+  type: http
+  seq: 22
+
+http:
+  method: GET
+  url: "{{host}}/ping"
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("should return all env vars including host", function() {
+          const vars = bru.getAllEnvVars();
+          expect(vars.host).to.be.a("string");
+        });
+
+        test("should not include __name__ in result", function() {
+          const vars = bru.getAllEnvVars();
+          expect(vars.__name__).to.be.undefined;
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

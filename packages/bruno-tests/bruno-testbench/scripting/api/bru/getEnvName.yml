@@ -1,0 +1,27 @@
+info:
+  name: getEnvName
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{host}}/ping"
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        const envName = bru.getEnvName();
+        bru.setVar("testEnvName", envName);
+    - type: tests
+      code: |-
+        test("should get env name in scripts", function() {
+          const testEnvName = bru.getVar("testEnvName");
+          expect(testEnvName).to.equal("Prod");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

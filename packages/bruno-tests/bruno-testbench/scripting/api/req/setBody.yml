@@ -1,0 +1,40 @@
+info:
+  name: setBody
+  type: http
+  seq: 10
+
+http:
+  method: POST
+  url: "{{host}}/api/echo/json"
+  body:
+    type: json
+    data: |-
+      {
+        "hello": "bruno"
+      }
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        req.setBody({
+          "bruno": "is awesome"
+        });
+    - type: tests
+      code: |-
+        test("req.setBody()", function() {
+          const data = res.getBody();
+          expect(data).to.eql({
+            "bruno": "is awesome"
+          });
+        });
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

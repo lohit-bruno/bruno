@@ -1,0 +1,30 @@
+info:
+  name: getSize
+  type: http
+  seq: 8
+
+http:
+  method: GET
+  url: https://www.httpfaker.org/api/random/json?size=1mb
+  params:
+    - name: size
+      value: 1mb
+      type: query
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: after-response
+      code: console.log(res.getSize())
+    - type: tests
+      code: |-
+        test("test total size", function() {
+          const sizes = res.getSize();
+          expect(sizes.total).to.equal(sizes.header + sizes.body);
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

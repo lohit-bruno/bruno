@@ -1,0 +1,26 @@
+info:
+  name: Digest Auth 200
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: https://www.httpfaker.org/api/auth/digest/auth/admin/password
+  auth:
+    type: digest
+    username: admin
+    password: password
+
+runtime:
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+    - expression: res.body.authenticated
+      operator: isTruthy
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,17 @@
+info:
+  name: echo xml raw
+  type: http
+  seq: 5
+
+http:
+  method: POST
+  url: "{{host}}/api/echo/xml-raw"
+  body:
+    type: xml
+    data: <hello><world>bruno</world></hello>
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

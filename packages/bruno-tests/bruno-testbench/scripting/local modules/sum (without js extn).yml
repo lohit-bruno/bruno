@@ -1,0 +1,49 @@
+info:
+  name: sum (without js extn)
+  type: http
+  seq: 2
+
+http:
+  method: POST
+  url: "{{host}}/api/echo/json"
+  body:
+    type: json
+    data: |-
+      {
+        "a": 1,
+        "b": 2
+      }
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        const math = require("./lib/math");
+        console.log(math, 'math');
+
+        const body = req.getBody();
+        body.sum = math.sum(body.a, body.b);
+        body.areaOfCircle = math.areaOfCircle(2);
+
+        req.setBody(body);
+    - type: tests
+      code: |-
+        test("should return json", function() {
+          const data = res.getBody();
+          expect(res.getBody()).to.eql({
+            "a": 1,
+            "b": 2,
+            "sum": 3,
+            "areaOfCircle": 12.56
+          });
+        });
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

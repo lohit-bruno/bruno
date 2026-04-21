@@ -1,0 +1,35 @@
+info:
+  name: getBody
+  type: http
+  seq: 9
+
+http:
+  method: POST
+  url: "{{host}}/api/echo/json"
+  body:
+    type: json
+    data: |-
+      {
+        "hello": "bruno"
+      }
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("req.getBody()", function() {
+          const data = res.getBody();
+          expect(data).to.eql({
+            "hello": "bruno"
+          });
+        });
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

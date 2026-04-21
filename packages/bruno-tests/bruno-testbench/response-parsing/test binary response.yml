@@ -1,0 +1,38 @@
+info:
+  name: test binary response
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{httpfaker}}/api/echo/custom"
+  body:
+    type: json
+    data: |-
+      {
+        "type": "application/octet-stream",
+        "contentBase64": "+Z1P82iH1wmbILfvnhvjQVbVAktP4TzltpxYD74zNyA="
+      }
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("response matches the expectation after utf-8 decoding(needs improvement)", function () {
+          expect(res.getStatus()).to.equal(200);
+          const dataBinary = Buffer.from("+Z1P82iH1wmbILfvnhvjQVbVAktP4TzltpxYD74zNyA=", "base64"); 
+          expect(res.body).to.equal(dataBinary.toString("utf-8"));
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
+
+docs: |-
+  Note:
+
+  This test is not perfect and needs to be improved by direclty matching expected binary data with raw-response.
+
+  Currently res.body is decoded with `utf-8` by default and looses data in the process. We need some property in `res` which gives access to raw-data/Buffer.

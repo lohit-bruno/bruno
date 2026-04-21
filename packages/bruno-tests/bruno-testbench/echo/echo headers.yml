@@ -1,0 +1,27 @@
+info:
+  name: echo headers
+  type: http
+  seq: 13
+
+http:
+  method: POST
+  url: "{{echo-host}}"
+  headers:
+    - name: Custom-Header-String
+      value: bruno
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("test headers",function() {
+          expect(res.getHeaders()).to.have.property("Custom-Header-String".toLowerCase())
+          expect(res.getHeaders()).to.have.property("Custom-Header-String".toLowerCase(), "bruno")
+        })
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

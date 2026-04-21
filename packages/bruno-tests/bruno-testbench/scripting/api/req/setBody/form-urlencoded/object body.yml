@@ -1,0 +1,39 @@
+info:
+  name: object body
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{echo-host}}"
+  body:
+    type: form-urlencoded
+  auth: inherit
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        req.setBody({
+          "key": "value with spaces",
+          "name": "bruno",
+          "array": ["test", "value"],
+        });
+    - type: tests
+      code: |-
+        // https://github.com/usebruno/bruno/issues/5813
+        test("req.setBody() with object - request body", function() {
+          const data = req.getBody();
+          expect(data).to.eql("key=value%20with%20spaces&name=bruno&array=test&array=value");
+        });
+
+        test("req.setBody() with object - response body", function() {
+          const data = res.getBody();
+          expect(data).to.eql("key=value%20with%20spaces&name=bruno&array=test&array=value");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

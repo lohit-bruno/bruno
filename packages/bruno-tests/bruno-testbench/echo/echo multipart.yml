@@ -1,0 +1,54 @@
+info:
+  name: echo multipart
+  type: http
+  seq: 8
+
+http:
+  method: POST
+  url: "{{echo-host}}"
+  body:
+    type: multipart-form
+    data:
+      - name: foo
+        type: text
+        value: '{"bar":"baz"}'
+      - name: multiline
+        type: text
+        value: '"multiline-test"'
+      - name: form-data-key
+        type: text
+        value: "{{form-data-key}}"
+      - name: form-data-stringified-object
+        type: text
+        value: "{{form-data-stringified-object}}"
+      - name: file
+        type: file
+        value:
+          - bruno.png
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        let obj = JSON.stringify({foo:123});
+        bru.setVar('form-data-key', 'form-data-value');
+        bru.setVar('form-data-stringified-object', obj);
+  assertions:
+    - expression: res.body
+      operator: contains
+      value: form-data-value
+    - expression: res.body
+      operator: contains
+      value: '{"foo":123}'
+    - expression: res.body
+      operator: contains
+      value: "Content-Type: application/json--test"
+    - expression: res.body
+      operator: contains
+      value: "Content-Type: application/json--multiline--test"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

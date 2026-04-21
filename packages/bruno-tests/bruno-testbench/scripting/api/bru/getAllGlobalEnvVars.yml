@@ -1,0 +1,35 @@
+info:
+  name: getAllGlobalEnvVars
+  type: http
+  seq: 20
+
+http:
+  method: GET
+  url: "{{host}}/ping"
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        bru.setGlobalEnvVar("testGlobalA", "valueA");
+        bru.setGlobalEnvVar("testGlobalB", "valueB");
+    - type: tests
+      code: |-
+        test("should return all global env vars", function() {
+          const vars = bru.getAllGlobalEnvVars();
+          expect(vars.testGlobalA).to.equal("valueA");
+          expect(vars.testGlobalB).to.equal("valueB");
+        });
+
+        test("should return a shallow copy", function() {
+          const vars = bru.getAllGlobalEnvVars();
+          vars.testGlobalA = "mutated";
+          const vars2 = bru.getAllGlobalEnvVars();
+          expect(vars2.testGlobalA).to.equal("valueA");
+        });
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

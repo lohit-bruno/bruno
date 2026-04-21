@@ -1,0 +1,24 @@
+name: Prod
+variables:
+  - name: host
+    value: https://testbench-sanity.usebruno.com
+  - name: localhost
+    value: http://localhost:8081
+  - name: httpfaker
+    value: https://www.httpfaker.org
+  - name: bearer_auth_token
+    value: your_secret_token
+  - name: basic_auth_password
+    value: della
+  - name: env.var1
+    value: envVar1
+  - name: env-var2
+    value: envVar2
+  - name: bark
+    value: "{{process.env.PROC_ENV_VAR}}"
+  - name: foo
+    value: bar
+  - name: testSetEnvVar
+    value: bruno-29653
+  - name: echo-host
+    value: https://echo.usebruno.com

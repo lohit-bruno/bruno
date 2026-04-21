@@ -1,0 +1,37 @@
+info:
+  name: echo xml parsed
+  type: http
+  seq: 4
+
+http:
+  method: POST
+  url: "{{host}}/api/echo/xml-parsed"
+  body:
+    type: xml
+    data: |-
+      <hello>
+        <world>bruno</world>
+      </hello>
+
+runtime:
+  scripts:
+    - type: tests
+      code: |-
+        test("should return parsed xml", function() {
+          const data = res.getBody();
+          expect(res.getBody()).to.eql({
+            "hello": {
+              "world": ["bruno"]
+            }
+          });
+        });
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

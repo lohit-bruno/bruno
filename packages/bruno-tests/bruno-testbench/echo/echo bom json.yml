@@ -1,0 +1,14 @@
+info:
+  name: echo bom json
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: "{{host}}/api/echo/bom-json-test"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

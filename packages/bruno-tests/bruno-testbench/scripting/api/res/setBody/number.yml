@@ -1,0 +1,35 @@
+info:
+  name: number
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: "{{host}}/api/echo/json"
+  body:
+    type: json
+    data: |-
+      {
+        "hello": "bruno"
+      }
+
+runtime:
+  scripts:
+    - type: after-response
+      code: res.setBody(2)
+    - type: tests
+      code: |-
+        test("res.setBody(number)", function() {
+          const body = res.getBody();
+          expect(body).to.eql(2);
+        });
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

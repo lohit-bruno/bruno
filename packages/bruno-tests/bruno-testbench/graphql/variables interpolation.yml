@@ -1,0 +1,52 @@
+info:
+  name: variables interpolation
+  type: graphql
+  seq: 3
+
+graphql:
+  method: POST
+  url: "{{host}}/api/echo/json"
+  body:
+    query: query { __typename }
+    variables: |-
+      {
+        "my_json": "{{my_json}}"
+      }
+
+runtime:
+  scripts:
+    - type: before-request
+      code: |-
+        const testData = {
+          a: [1,2,3],
+          b: {
+            c: "test",
+            d: "another value"
+          }
+        };
+
+        // Single escaping
+        let cv = JSON.stringify(testData).replace(/"/g, '\\"');
+
+        bru.setVar("my_json", cv)
+    - type: after-response
+      code: bru.deleteVar("my_json")
+    - type: tests
+      code: |-
+        test("GraphQL variables with nested object and array are interpolated then sent as parsed object", function() {
+          const body = res.getBody();
+          expect(body).to.have.property("variables");
+          expect(body.variables).to.be.an("object");
+          expect(body.variables).to.have.property("my_json");
+          expect(body.variables.my_json).to.eql("{\"a\":[1,2,3],\"b\":{\"c\":\"test\",\"d\":\"another value\"}}");
+        });
+  assertions:
+    - expression: res.status
+      operator: eq
+      value: "200"
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

@@ -1,0 +1,133 @@
+info:
+  name: test-assert-combinations
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: "{{httpfaker}}/api/echo/custom"
+  body:
+    type: json
+    data: |-
+      {
+        "type": "application/json",
+        "contentJSON": {
+          "string": "foo",
+          "stringWithSQuotes": "'foo'",
+          "stringWithDQuotes": "\"foo\"",
+          "number": 123,
+          "numberAsString": "123",
+          "numberAsStringWithSQuotes": "'123'",
+          "numberAsStringWithDQuotes": "\"123\"",
+          "numberAsStringWithLeadingZero": "0123",
+          "numberBig": 9007199254740992000,
+          "numberBigAsString": "9007199254740991999",
+          "null": null,
+          "nullAsString": "null",
+          "nullAsStringWithSQuotes": "'null'",
+          "nullAsStringWithDQuotes": "\"null\"",
+          "true": true,
+          "trueAsString": "true",
+          "trueAsStringWithSQuotes": "'true'",
+          "trueAsStringWithDQuotes": "\"true\"",
+          "false": false,
+          "falseAsString": "false",
+          "falseAsStringWithSQuotes": "'false'",
+          "falseAsStringWithDQuotes": "\"false\"",
+          "stringWithCurlyBraces": "{foo}",
+          "stringWithDoubleCurlyBraces": "{{foobar}}"
+        }
+      }
+
+runtime:
+  assertions:
+    - expression: res.body.string
+      operator: eq
+      value: foo
+    - expression: res.body.string
+      operator: eq
+      value: "'foo'"
+    - expression: res.body.string
+      operator: eq
+      value: '"foo"'
+    - expression: res.body.stringWithSQuotes
+      operator: eq
+      value: "\"'foo'\""
+    - expression: res.body.stringWithDQuotes
+      operator: eq
+      value: "'\"foo\"'"
+    - expression: res.body.number
+      operator: eq
+      value: "123"
+    - expression: res.body.numberAsString
+      operator: eq
+      value: "'123'"
+    - expression: res.body.numberAsString
+      operator: eq
+      value: '"123"'
+    - expression: res.body.numberAsStringWithSQuotes
+      operator: eq
+      value: "\"'123'\""
+    - expression: res.body.numberAsStringWithDQuotes
+      operator: eq
+      value: "'\"123\"'"
+    - expression: res.body.numberAsStringWithLeadingZero
+      operator: eq
+      value: '"0123"'
+    - expression: res.body.numberBig.toString()
+      operator: eq
+      value: "'9007199254740992000'"
+    - expression: res.body.numberBigAsString
+      operator: eq
+      value: '"9007199254740991999"'
+    - expression: res.body.null
+      operator: eq
+      value: "null"
+    - expression: res.body.nullAsString
+      operator: eq
+      value: '"null"'
+    - expression: res.body.nullAsStringWithSQuotes
+      operator: eq
+      value: "\"'null'\""
+    - expression: res.body.nullAsStringWithDQuotes
+      operator: eq
+      value: "'\"null\"'"
+    - expression: res.body.true
+      operator: eq
+      value: "true"
+    - expression: res.body.trueAsString
+      operator: eq
+      value: '"true"'
+    - expression: res.body.trueAsStringWithSQuotes
+      operator: eq
+      value: "\"'true'\""
+    - expression: res.body.trueAsStringWithDQuotes
+      operator: eq
+      value: "'\"true\"'"
+    - expression: res.body.false
+      operator: eq
+      value: "false"
+    - expression: res.body.falseAsString
+      operator: eq
+      value: '"false"'
+    - expression: res.body.falseAsStringWithSQuotes
+      operator: eq
+      value: "\"'false'\""
+    - expression: res.body.falseAsStringWithDQuotes
+      operator: eq
+      value: "'\"false\"'"
+    - expression: res.body.nonexistent
+      operator: eq
+      value: undefined
+    - expression: res.body.stringWithCurlyBraces
+      operator: eq
+      value: '"{foo}"'
+    - expression: res.body.stringWithDoubleCurlyBraces
+      operator: eq
+      value: '"{{foobar}}"'
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
